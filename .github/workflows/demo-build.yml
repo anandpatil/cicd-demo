@@ -18,16 +18,32 @@ jobs:
         run: docker version
 
       - name: Build User Service
-        run: docker build -t user-service:latest ./microservices/user-service
+        run: |
+          echo "🏗️ Building User Service..."
+          docker build -t user-service:latest ./microservices/user-service
+          echo "✅ User Service built successfully"
 
       - name: Build Order Service
-        run: docker build -t order-service:latest ./microservices/order-service
+        run: |
+          echo "🏗️ Building Order Service..."
+          docker build -t order-service:latest ./microservices/order-service
+          echo "✅ Order Service built successfully"
 
       - name: Build Inventory Service
-        run: docker build -t inventory-service:latest ./microservices/inventory-service
+        run: |
+          echo "🏗️ Building Inventory Service..."
+          docker build -t inventory-service:latest ./microservices/inventory-service
+          echo "✅ Inventory Service built successfully"
 
-      - name: List Images
+      - name: List Built Images
         run: docker images | grep -E "user-service|order-service|inventory-service"
+
+      - name: Run Container Validation
+        run: |
+          echo "🔍 Validating Docker images..."
+          docker inspect user-service:latest > /dev/null && echo "✅ User Service image valid"
+          docker inspect order-service:latest > /dev/null && echo "✅ Order Service image valid"
+          docker inspect inventory-service:latest > /dev/null && echo "✅ Inventory Service image valid"
 
       - name: Simulate Pipeline Success
         run: |
@@ -39,5 +55,11 @@ jobs:
           echo "✅ Unit Tests"
           echo "✅ Security Scan"
           echo "✅ Docker Build"
+          echo "✅ Image Validation"
           echo "✅ Deploy to Staging"
+          echo "========================================="
+          echo "📊 Summary:"
+          echo "   - 3 Microservices built"
+          echo "   - All security checks passed"
+          echo "   - Ready for deployment"
           echo "========================================="

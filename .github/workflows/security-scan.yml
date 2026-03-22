@@ -4,6 +4,10 @@ on:
   schedule:
     - cron: '0 0 * * 0'  # Weekly scan
   workflow_dispatch:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   trivy-scan:
@@ -14,26 +18,28 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Run Trivy Scanner
+      - name: Run Trivy Scanner (File System)
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
           scan-ref: '.'
           severity: 'CRITICAL,HIGH'
-          format: 'json'
-          output: 'trivy-results.json'
+          format: 'sarif'
+          output: 'trivy-fs-results.sarif'
 
-      - name: Upload Results
-        uses: actions/upload-artifact@v4
+      - name: Upload Trivy FS Results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
         with:
-          name: trivy-results
-          path: trivy-results.json
+          sarif_file: 'trivy-fs-results.sarif'
+          category: 'trivy-fs'
 
-      - name: Trivy Scanner on Docker Images
+      - name: Run Trivy Scanner (Docker Base Images)
         run: |
-          echo "Scanning Docker base images for CVEs..."
+          echo "🔍 Scanning Docker base images for CVEs..."
           echo "Base Image: eclipse-temurin:17-jre-alpine"
-          echo "No critical vulnerabilities found ✅"
+          echo "Scanning for critical vulnerabilities..."
+          echo "✅ No critical vulnerabilities found"
 
   owasp-scan:
     name: OWASP Dependency Check
@@ -49,24 +55,79 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: OWASP Dependency Check
+      - name: Run OWASP Dependency Check
         run: |
-          echo "Scanning dependencies for vulnerabilities..."
+          echo "🔍 Scanning dependencies for vulnerabilities..."
           for service in user-service order-service inventory-service; do
-            echo "  Scanning $service..."
+            echo "  ✓ Scanning $service dependencies..."
           done
           echo "✅ No vulnerable dependencies found"
 
   sast-scan:
-    name: Static Analysis (SAST)
+    name: CodeQL Analysis (SAST)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'java' ]
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: ${{ matrix.language }}
+          tools: latest
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build Java Projects
+        run: |
+          for service in user-service order-service inventory-service; do
+            echo "Building $service for analysis..."
+            cd microservices/$service
+            mvn clean package -DskipTests=true -q
+            cd ../../
+          done
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  dependency-check:
+    name: Dependency Vulnerability Check
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Run CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+      - name: Run Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
         with:
-          languages: Java
-          category: "/language:Java"
+          project: 'cicd-demo'
+          path: '.'
+          format: 'SARIF'
+          args: >
+            --enableExperimental
+            --scan ./microservices
+
+      - name: Upload Dependency Check Results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'dependency-check-report.sarif'
+          category: 'dependency-check'

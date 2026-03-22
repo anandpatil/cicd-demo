@@ -1,0 +1,76 @@
+version: 2
+updates:
+  # Enable Dependabot for Maven dependencies
+  - package-ecosystem: "maven"
+    directory: "/microservices/user-service"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "devops-team"
+    labels:
+      - "dependencies"
+      - "maven"
+    commit-message:
+      prefix: "build: "
+      include: "scope"
+    rebase-strategy: "disabled"
+    allow:
+      - dependency-type: "all"
+
+  - package-ecosystem: "maven"
+    directory: "/microservices/order-service"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "devops-team"
+    labels:
+      - "dependencies"
+      - "maven"
+
+  - package-ecosystem: "maven"
+    directory: "/microservices/inventory-service"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "devops-team"
+    labels:
+      - "dependencies"
+      - "maven"
+
+  # Enable Dependabot for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    reviewers:
+      - "devops-team"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci: "
+      include: "scope"
+
+  # Enable Dependabot for Docker images
+  - package-ecosystem: "docker"
+    directory: "/docker"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    reviewers:
+      - "devops-team"
+    labels:
+      - "dependencies"
+      - "docker"
