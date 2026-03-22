@@ -38,11 +38,11 @@
             <!-- Slide 1: Title -->
             <section class="title-slide">
                 <h1>🚀 DevSecOps CI/CD Pipeline</h1>
-                <h2>Jenkins + Docker + Bitbucket</h2>
+                <h2>GitHub Actions + Docker + Jenkins</h2>
                 <p style="margin-top: 40px;">For Microservices Architecture</p>
                 <p style="margin-top: 60px; color: #FFD700;">CDAC - Advanced Computing</p>
                 <p style="color: #00FF88;">Practical Demo & Implementation Guide</p>
-                <aside class="notes">Welcome to the DevSecOps CI/CD Pipeline lecture. This session covers Jenkins, Docker, and Bitbucket integration for microservices.</aside>
+                <aside class="notes">Welcome to the DevSecOps CI/CD Pipeline lecture. This session covers GitHub Actions, Jenkins, and Docker for microservices.</aside>
             </section>
 
             <!-- Slide 2: Agenda -->
@@ -51,9 +51,9 @@
                 <ul class="spark-list">
                     <li>Introduction to DevSecOps & CI/CD</li>
                     <li>Microservices Architecture Overview</li>
+                    <li>GitHub Actions Workflow</li>
                     <li>Jenkins Pipeline Setup</li>
                     <li>Docker Containerization</li>
-                    <li>Bitbucket Integration</li>
                     <li>Security Scanning (DevSecOps)</li>
                     <li>Alerting & Notifications</li>
                     <li>Live Demo</li>
@@ -85,13 +85,13 @@
             <section>
                 <h2>🔄 CI/CD Pipeline Flow</h2>
                 <div class="flow-diagram">
-                    <div class="pipeline-stage stage-build">📝 Code Commit<br/>Bitbucket</div>
+                    <div class="pipeline-stage stage-build">📝 Code Commit<br/>GitHub</div>
                     <div style="font-size:2em">→</div>
-                    <div class="pipeline-stage stage-build">🔨 Build<br/>Maven/Gradle</div>
+                    <div class="pipeline-stage stage-build">🔨 Build<br/>Maven</div>
                     <div style="font-size:2em">→</div>
                     <div class="pipeline-stage stage-test">🧪 Unit Tests<br/>JUnit</div>
                     <div style="font-size:2em">→</div>
-                    <div class="pipeline-stage stage-test">🔍 Code Quality<br/>SonarQube</div>
+                    <div class="pipeline-stage stage-test">🔍 Code Quality<br/>CodeQL</div>
                     <div style="font-size:2em">→</div>
                     <div class="pipeline-stage stage-deploy">🐳 Docker Build<br/>Containerize</div>
                     <div style="font-size:2em">→</div>
@@ -106,81 +106,99 @@
 ┌─────────────────────────────────────────────────────┐
 │                  Load Balancer                      │
 └─────────────────────────────────────────────────────┘
-           │              │              │
-     ┌─────▼─────┐ ┌─────▼─────┐ ┌─────▼─────┐
-     │  User     │ │  Order    │ │ Inventory │
-     │ Service   │ │ Service   │ │ Service   │
-     │  :8081    │ │  :8082    │ │  :8083    │
-     └───────────┘ └───────────┘ └───────────┘
+            │              │              │
+      ┌─────▼─────┐ ┌─────▼─────┐ ┌─────▼─────┐
+      │  User     │ │  Order    │ │ Inventory │
+      │ Service   │ │ Service   │ │ Service   │
+      │  :8081    │ │  :8082    │ │  :8083    │
+      └───────────┘ └───────────┘ └───────────┘
                 </pre>
                 <p style="text-align:center; color: #FFD700;">Each service: Independent Deployment, Scaling, Technology Stack</p>
             </section>
 
-            <!-- Slide 6: Jenkins Introduction -->
+            <!-- Slide 6: GitHub Actions Introduction -->
             <section>
-                <h2>⚙️ Jenkins - The Automation Server</h2>
+                <h2>🐙 GitHub Actions - CI/CD Built-in</h2>
                 <div class="columns">
                     <div class="column">
                         <h3>Features</h3>
                         <ul>
-                            <li>Open Source</li>
-                            <li>Plugin Ecosystem (1800+)</li>
-                            <li>Pipeline as Code</li>
-                            <li>Distributed Builds</li>
-                            <li>Blue/Green Deployments</li>
+                            <li>✅ Free for public repos</li>
+                            <li>✅ YAML-based workflows</li>
+                            <li>✅ Marketplace for actions</li>
+                            <li>✅ Native GitHub integration</li>
+                            <li>✅ Matrix builds</li>
                         </ul>
                     </div>
                     <div class="column">
-                        <h3>Key Plugins</h3>
-                        <ul>
-                            <li><code>Pipeline</code> - DSL for pipelines</li>
-                            <li><code>Docker Pipeline</code></li>
-                            <li><code>Slack Notification</code></li>
-                            <li><code>Email Extension</code></li>
-                            <li><code>SonarQube Scanner</code></li>
-                        </ul>
+                        <h3>Workflows</h3>
+                        <pre><code>ci-cd-pipeline.yml   # Main CI/CD
+security-scan.yml     # Weekly scan
+demo-build.yml        # Quick demo</code></pre>
                     </div>
                 </div>
             </section>
 
-            <!-- Slide 7: Jenkinsfile Structure -->
+            <!-- Slide 7: GitHub Actions Workflow -->
             <section>
-                <h2>📄 Jenkinsfile Structure</h2>
+                <h2>📄 GitHub Actions Workflow</h2>
+                <pre><code>name: DevSecOps CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+      - run: mvn clean package
+      - run: mvn test
+      
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'</code></pre>
+            </section>
+
+            <!-- Slide 8: Jenkinsfile Structure -->
+            <section>
+                <h2>⚙️ Jenkinsfile Structure</h2>
                 <pre><code>pipeline {
     agent any
     
     stages {
         stage('Checkout') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
         stage('Build') {
-            steps {
-                sh 'mvn clean package'
-            }
+            steps { sh 'mvn clean package' }
         }
         stage('Test') {
-            steps {
-                sh 'mvn test'
-            }
+            steps { sh 'mvn test' }
         }
-        stage('Deploy') {
-            steps {
-                sh 'docker build && docker push'
-            }
+        stage('Docker Build') {
+            steps { sh 'docker build -t app .' }
         }
     }
     
     post {
         failure {
-            slackSend(message: "Build Failed!")
+            slackSend(message: "❌ Build Failed!")
         }
     }
 }</code></pre>
             </section>
 
-            <!-- Slide 8: Docker Setup -->
+            <!-- Slide 9: Docker Setup -->
             <section>
                 <h2>🐳 Docker for Microservices</h2>
                 <h3>Dockerfile Best Practices</h3>
@@ -192,17 +210,17 @@ RUN mvn dependency:go-offline
 COPY src ./src
 RUN mvn clean package
 
-# Runtime stage
+# Runtime stage - minimal image
 FROM eclipse-temurin:17-jre-alpine
 RUN addgroup -S app && adduser -S app -G app
 COPY --from=builder /app/target/*.jar app.jar
 USER app
 EXPOSE 8081
-HEALTHCHECK --interval=30s CMD curl -f health
-ENTRYPOINT ["java", "-jar", "app.jar"]</code></pre>
+HEALTHCHECK --interval=30s CMD wget --spider localhost:8081/health
+ENTRYPOINT ["java", "-jar", "-Xms256m", "-Xmx512m", "app.jar"]</code></pre>
             </section>
 
-            <!-- Slide 9: Docker Compose -->
+            <!-- Slide 10: Docker Compose -->
             <section>
                 <h2>📦 Docker Compose</h2>
                 <pre><code>version: '3.8'
@@ -231,39 +249,40 @@ networks:
     driver: bridge</code></pre>
             </section>
 
-            <!-- Slide 10: Bitbucket Integration -->
+            <!-- Slide 11: GitHub Integration -->
             <section>
-                <h2>🔗 Bitbucket Integration</h2>
+                <h2>🔗 GitHub Actions + Jenkins</h2>
                 <div class="columns">
                     <div class="column">
                         <h3>Webhook Events</h3>
                         <ul>
-                            <li><code>repo:push</code> - Trigger on push</li>
-                            <li><code>pullrequest:created</code></li>
-                            <li><code>pullrequest:merged</code></li>
-                            <li><code>issue:created</code></li>
+                            <li><code>push</code> - Trigger on push</li>
+                            <li><code>pull_request</code></li>
+                            <li><code>workflow_dispatch</code> - Manual</li>
+                            <li><code>schedule</code> - Cron jobs</li>
                         </ul>
                     </div>
                     <div class="column">
-                        <h3>Jenkins Configuration</h3>
-                        <pre><code>Bitbucket Bucket Sources Plugin
-├── Auto-discover branches
-├── Build PRs automatically  
-└── Webhook management</code></pre>
+                        <h3>GitHub Secrets</h3>
+                        <pre><code>DOCKER_USERNAME  # Docker Hub
+DOCKER_TOKEN     # Access token
+SLACK_WEBHOOK_URL
+EMAIL_USERNAME
+EMAIL_PASSWORD</code></pre>
                     </div>
                 </div>
             </section>
 
-            <!-- Slide 11: DevSecOps - Security Scanning -->
+            <!-- Slide 12: DevSecOps - Security Scanning -->
             <section>
                 <h2>🔒 DevSecOps Security Pipeline</h2>
                 <div class="pipeline-stage stage-test" style="margin-bottom:20px;">
-                    <h3>Static Application Security Testing (SAST)</h3>
-                    <p>SonarQube - Code Quality & Security Hotspots</p>
+                    <h3>SAST - Static Analysis (CodeQL)</h3>
+                    <p>GitHub CodeQL - Security queries</p>
                 </div>
                 <div class="pipeline-stage stage-alert" style="margin-bottom:20px;">
-                    <h3>Software Composition Analysis (SCA)</h3>
-                    <p>OWASP Dependency Check - Vulnerable Dependencies</p>
+                    <h3>SCA - Dependency Scanning</h3>
+                    <p>Trivy / OWASP - Vulnerable dependencies</p>
                 </div>
                 <div class="pipeline-stage stage-alert">
                     <h3>Container Scanning</h3>
@@ -271,94 +290,82 @@ networks:
                 </div>
             </section>
 
-            <!-- Slide 12: Alerting System -->
+            <!-- Slide 13: Alerting System -->
             <section>
                 <h2>🚨 Alerting & Notifications</h2>
                 <div class="columns">
                     <div class="column">
                         <h3>Notification Channels</h3>
                         <ul>
-                            <li><span class="highlight">Slack</span> - Real-time team alerts</li>
+                            <li><span class="highlight">Slack</span> - Real-time alerts</li>
                             <li><span class="highlight">Email</span> - Detailed reports</li>
-                            <li><span class="warning">PagerDuty</span> - Critical escalation</li>
-                            <li><span class="highlight">Teams</span> - Microsoft integration</li>
+                            <li><span class="warning">PagerDuty</span> - Escalation</li>
                         </ul>
                     </div>
                     <div class="column">
-                        <h3>Alert Triggers</h3>
-                        <pre><code>post {
-    success {
-        slackSend("✅ Build Passed")
-    }
-    failure {
-        slackSend("❌ Build Failed!")
-        emailext("ALERT: Build Failed")
-    }
-}</code></pre>
+                        <h3>GitHub Actions Alert</h3>
+                        <pre><code>- name: Slack Alert
+  uses: slackapi/slack-github-action
+  with:
+    payload: |
+      {"text": "❌ Build Failed!"}
+  env:
+    SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}</code></pre>
                     </div>
                 </div>
             </section>
 
-            <!-- Slide 13: Alert Configuration -->
+            <!-- Slide 14: Alert Configuration -->
             <section>
                 <h2>📊 Alert Configuration</h2>
-                <pre><code>NOTIFICATIONS:
-  SLACK:
-    enabled: true
-    channel: "#cicd-alerts"
-    events:
-      - build_failure      # Critical
-      - build_success       # Info
-      - security_scan_fail  # Critical
-      - deployment_failure  # High
-      
-  EMAIL:
-    enabled: true
-    recipients:
-      - devops-team@cdac.com
-      - developers@cdac.com
-    attachLog: true
-        
-ESCALATION:
-  build_failure:
-    level 1 → Developers (0 min)
-    level 2 → DevOps Lead (15 min)  
-    level 3 → On-Call (30 min)</code></pre>
+                <pre><code>ALERT_THRESHOLDS:
+  BUILD_FAILURE_THRESHOLD: 3        
+  BUILD_DURATION_WARNING: 30m       
+  BUILD_DURATION_CRITICAL: 1h        
+
+  # Security Alerts
+  CRITICAL_VULNERABILITIES: 0       
+  HIGH_VULNERABILITIES: 5            
+  MEDIUM_VULNERABILITIES: 20        
+
+ESCALATION_RULES:
+  level_1: Developers (immediate)
+  level_2: DevOps Lead (15 min)  
+  level_3: On-Call (30 min)</code></pre>
             </section>
 
-            <!-- Slide 14: Project Structure -->
+            <!-- Slide 15: Project Structure -->
             <section>
                 <h2>📁 Project Structure</h2>
                 <pre><code>cicd-demo/
+├── .github/
+│   └── workflows/              # GitHub Actions
+│       ├── ci-cd-pipeline.yml
+│       ├── security-scan.yml
+│       └── demo-build.yml
 ├── microservices/
-│   ├── user-service/       # Java Spring Boot
-│   │   ├── src/
-│   │   ├── Dockerfile
-│   │   └── pom.xml
+│   ├── user-service/          # Java Spring Boot
 │   ├── order-service/
 │   └── inventory-service/
 ├── jenkins/
-│   └── Jenkinsfile        # Main pipeline
+│   └── Jenkinsfile            # Jenkins pipeline
 ├── docker/
-│   ├── docker-compose.yml  # Local dev
-│   ├── nginx.conf          # Load balancer
-│   └── prometheus.yml      # Monitoring
-├── alerts/                 # Notification configs
-├── bitbucket/              # Webhook handlers
+│   ├── docker-compose.yml
+│   └── nginx.conf
 └── README.md</code></pre>
             </section>
 
-            <!-- Slide 15: Live Demo -->
+            <!-- Slide 16: Live Demo -->
             <section>
                 <h2>🎬 Live Demo Setup</h2>
                 <div class="architecture-box">
                     <h3>Demo Flow</h3>
                     <ol>
-                        <li>1️⃣ Push code to Bitbucket</li>
-                        <li>2️⃣ Webhook triggers Jenkins</li>
+                        <li>1️⃣ Push code to GitHub</li>
+                        <li>2️⃣ GitHub Actions triggers</li>
                         <li>3️⃣ Pipeline executes stages</li>
                         <li>4️⃣ Docker images built</li>
-                        <li>5️⃣ Security scans run</li>
+                        <li>5️⃣ Security scans run (Trivy)</li>
                         <li>6️⃣ Deploy to staging</li>
                         <li>7️⃣ Alert on success/failure</li>
                     </ol>
@@ -366,32 +373,29 @@ ESCALATION:
                 <p style="text-align:center; color: #00FF88;">Let's see it in action! 🚀</p>
             </section>
 
-            <!-- Slide 16: Commands -->
+            <!-- Slide 17: Commands -->
             <section>
                 <h2>⌨️ Key Commands</h2>
-                <pre><code># Start local environment
+                <pre><code># GitHub CLI
+gh workflow list
+gh run watch
+gh run download
+
+# Start environment
 docker-compose up -d
 
-# Run specific service
-docker-compose up user-service
-
-# View logs
-docker-compose logs -f order-service
-
-# Build Docker image
+# Docker
 docker build -t user-service:latest ./user-service
+docker-compose logs -f
 
-# Run pipeline manually
-curl -X POST JENKINS_URL/job/pipeline/build
-
-# Check container health
-docker inspect --format='{{.State.Health.Status}}' user-service
+# Trigger pipeline
+gh workflow run demo-build.yml
 
 # Security scan
 trivy image user-service:latest</code></pre>
             </section>
 
-            <!-- Slide 17: Benefits -->
+            <!-- Slide 18: Benefits -->
             <section>
                 <h2>✨ CI/CD Benefits</h2>
                 <div class="columns">
@@ -425,37 +429,36 @@ trivy image user-service:latest</code></pre>
                 </div>
             </section>
 
-            <!-- Slide 18: Key Takeaways -->
+            <!-- Slide 19: Key Takeaways -->
             <section>
                 <h2>🎯 Key Takeaways</h2>
                 <ul class="spark-list">
                     <li>DevSecOps = Development + Security + Operations</li>
-                    <li>Jenkins Pipeline as Code for version-controlled CI/CD</li>
+                    <li>GitHub Actions = Free, built-in CI/CD for GitHub repos</li>
+                    <li>Jenkins = Alternative for enterprise CI/CD</li>
                     <li>Docker enables consistent microservice deployment</li>
                     <li>Security must be integrated throughout the pipeline</li>
                     <li>Alerting ensures rapid response to failures</li>
-                    <li>Automation reduces human error and speeds delivery</li>
                 </ul>
             </section>
 
-            <!-- Slide 19: Resources -->
+            <!-- Slide 20: Resources -->
             <section>
                 <h2>📚 Resources</h2>
                 <div class="columns">
                     <div class="column">
                         <h3>Documentation</h3>
                         <ul>
-                            <li>Jenkins.io - Pipeline docs</li>
-                            <li>Docker Docs - Best practices</li>
-                            <li>Bitbucket API - Webhooks</li>
-                            <li>SonarQube - Code analysis</li>
+                            <li>docs.github.com/actions</li>
+                            <li>Docker Docs</li>
+                            <li>Jenkins.io</li>
+                            <li>Trivy Scanner</li>
                         </ul>
                     </div>
                     <div class="column">
                         <h3>Practice</h3>
                         <ul>
-                            <li>GitHub: cdac-demo/cicd-demo</li>
-                            <li>Demo Environment Setup</li>
+                            <li>github.com/anandpatil/cicd-demo</li>
                             <li>Hands-on Labs</li>
                             <li>Assignment: Build your pipeline</li>
                         </ul>
@@ -463,14 +466,14 @@ trivy image user-service:latest</code></pre>
                 </div>
             </section>
 
-            <!-- Slide 20: Thank You -->
+            <!-- Slide 21: Thank You -->
             <section class="title-slide">
                 <h1>🙏 Thank You!</h1>
                 <h2 style="margin-top: 40px;">Questions?</h2>
                 <p style="margin-top: 60px;">
                     <span style="color: #FFD700;">Email:</span> devops@cdac.com<br>
                     <span style="color: #00FF88;">Slack:</span> #cdac-devsecops<br>
-                    <span style="color: #00D4FF;">Repo:</span> bitbucket.org/cdac-demo/cicd-microservices
+                    <span style="color: #00D4FF;">Repo:</span> github.com/anandpatil/cicd-demo
                 </p>
                 <p style="margin-top: 40px; color: #FFD700;">Happy Learning! 🚀</p>
             </section>

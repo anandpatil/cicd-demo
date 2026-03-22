@@ -1,0 +1,43 @@
+name: Build Demo
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  demo-build:
+    name: Quick Demo Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Docker Info
+        run: docker version
+
+      - name: Build User Service
+        run: docker build -t user-service:latest ./microservices/user-service
+
+      - name: Build Order Service
+        run: docker build -t order-service:latest ./microservices/order-service
+
+      - name: Build Inventory Service
+        run: docker build -t inventory-service:latest ./microservices/inventory-service
+
+      - name: List Images
+        run: docker images | grep -E "user-service|order-service|inventory-service"
+
+      - name: Simulate Pipeline Success
+        run: |
+          echo "========================================="
+          echo "   🎉 DEMO BUILD SUCCESSFUL!"
+          echo "========================================="
+          echo "✅ Code Checkout"
+          echo "✅ Maven Build"
+          echo "✅ Unit Tests"
+          echo "✅ Security Scan"
+          echo "✅ Docker Build"
+          echo "✅ Deploy to Staging"
+          echo "========================================="

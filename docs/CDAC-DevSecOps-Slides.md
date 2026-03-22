@@ -6,7 +6,7 @@
 # Slide 1: Title
 
 # 🚀 DevSecOps CI/CD Pipeline
-## Jenkins + Docker + Bitbucket
+## GitHub Actions + Docker + Jenkins
 
 For Microservices Architecture
 
@@ -20,9 +20,9 @@ Practical Demo & Implementation Guide
 
 1. Introduction to DevSecOps & CI/CD
 2. Microservices Architecture Overview
-3. Jenkins Pipeline Setup
-4. Docker Containerization
-5. Bitbucket Integration
+3. GitHub Actions Workflow
+4. Jenkins Pipeline Setup
+5. Docker Containerization
 6. Security Scanning (DevSecOps)
 7. Alerting & Notifications
 8. Live Demo
@@ -47,14 +47,14 @@ Integrating Security at every stage of the pipeline
 
 ```
 Code Commit → Build → Test → Security Scan → Docker Build → Deploy
-(Bitbucket)  (Maven)  (JUnit) (SonarQube)    (Docker)     (K8s)
+(GitHub)      (Maven)  (JUnit) (Trivy)       (Docker)     (K8s)
 ```
 
 ### Pipeline Stages:
-1. 📝 Code Commit (Bitbucket)
-2. 🔨 Build (Maven/Gradle)
+1. 📝 Code Commit (GitHub)
+2. 🔨 Build (Maven)
 3. 🧪 Unit Tests (JUnit)
-4. 🔍 Code Quality (SonarQube)
+4. 🔍 Code Quality (CodeQL)
 5. 🔒 Security Scans (Trivy, OWASP)
 6. 🐳 Docker Build (Containerize)
 7. ☸️ Deploy (K8s/Docker)
@@ -79,27 +79,62 @@ Each service: Independent Deployment, Scaling, Technology Stack
 
 ---
 
-# Slide 6: Jenkins Overview
+# Slide 6: GitHub Actions Overview
 
-## ⚙️ Jenkins - The Automation Server
+## 🐙 GitHub Actions - CI/CD Built-in
 
 ### Features:
-- Open Source
-- Plugin Ecosystem (1800+)
-- Pipeline as Code
-- Distributed Builds
-- Blue/Green Deployments
+- ✅ Free for public repos
+- ✅ YAML-based workflows
+- ✅ Marketplace for actions
+- ✅ Native GitHub integration
+- ✅ Matrix builds
 
-### Key Plugins:
-- `Pipeline` - DSL for pipelines
-- `Docker Pipeline`
-- `Slack Notification`
-- `Email Extension`
-- `SonarQube Scanner`
+### Workflows in this project:
+```yaml
+ci-cd-pipeline.yml   # Main CI/CD workflow
+security-scan.yml     # Scheduled security scans  
+demo-build.yml        # Quick demo build
+```
 
 ---
 
-# Slide 7: Jenkinsfile Structure
+# Slide 7: GitHub Actions Workflow
+
+```yaml
+name: DevSecOps CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+      - run: mvn clean package
+      - run: mvn test
+      
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          severity: 'CRITICAL,HIGH'
+```
+
+---
+
+# Slide 8: Jenkinsfile Structure
+
+## ⚙️ Jenkins Alternative Pipeline
 
 ```groovy
 pipeline {
@@ -107,39 +142,29 @@ pipeline {
     
     stages {
         stage('Checkout') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
         stage('Build') {
-            steps {
-                sh 'mvn clean package'
-            }
+            steps { sh 'mvn clean package' }
         }
         stage('Test') {
-            steps {
-                sh 'mvn test'
-            }
+            steps { sh 'mvn test' }
         }
         stage('Security Scan') {
-            steps {
-                sh 'trivy image --severity HIGH,CRITICAL app:latest'
-            }
+            steps { sh 'trivy fs --severity HIGH .' }
+        }
+        stage('Docker Build') {
+            steps { sh 'docker build -t app:latest .' }
         }
         stage('Deploy') {
-            steps {
-                sh 'docker build && docker push'
-            }
+            steps { sh 'docker push' }
         }
     }
     
     post {
         failure {
-            slackSend(message: "Build Failed!")
-            emailext(to: "devops@cdac.com", subject: "Build Failed")
-        }
-        success {
-            slackSend(message: "✅ Build Passed")
+            slackSend(message: "❌ Build Failed!")
+            emailext(to: "devops@cdac.com")
         }
     }
 }
@@ -147,7 +172,7 @@ pipeline {
 
 ---
 
-# Slide 8: Docker Best Practices
+# Slide 9: Docker Best Practices
 
 ## 🐳 Dockerfile Multi-stage Build
 
@@ -182,7 +207,7 @@ ENTRYPOINT ["java", "-jar", "-Xms256m", "-Xmx512m", "app.jar"]
 
 ---
 
-# Slide 9: Docker Compose
+# Slide 10: Docker Compose
 
 ```yaml
 version: '3.8'
@@ -219,55 +244,57 @@ networks:
 
 ---
 
-# Slide 10: Bitbucket Integration
+# Slide 11: GitHub Integration
 
-## 🔗 Webhook Configuration
+## 🔗 GitHub Actions + Jenkins
 
-### Bitbucket Webhook Events:
-- `repo:push` - Trigger on push to repository
-- `pullrequest:created` - New pull request
-- `pullrequest:merged` - PR merged
-- `issue:created` - New issue
+### GitHub Webhook Events:
+- `push` - Trigger on push to repository
+- `pull_request` - Pull request events
+- `workflow_dispatch` - Manual trigger
 
-### Jenkins Configuration:
-1. Install "Bitbucket Branch Source" Plugin
-2. Create Multibranch Pipeline
-3. Configure:
-   - Source: Bitbucket Cloud
-   - Owner: workspace-name
-   - Repository: cicd-microservices
-   - Credentials: Bitbucket App Password
+### Setup:
+1. Go to Repository → Actions tab
+2. Add GitHub Secrets
+3. Push code → Pipeline runs automatically
+
+### Secrets Configuration:
+| Secret | Purpose |
+|--------|---------|
+| `DOCKER_USERNAME` | Docker Hub login |
+| `DOCKER_TOKEN` | Docker Hub token |
+| `SLACK_WEBHOOK_URL` | Slack notifications |
 
 ---
 
-# Slide 11: DevSecOps Security Pipeline
+# Slide 12: DevSecOps Security Pipeline
 
 ## 🔒 Security Scanning Stages
 
 ### 1. SAST - Static Application Security Testing
 ```
-SonarQube - Code Quality & Security Hotspots
-- Checkmarx
-- Fortify
+GitHub CodeQL - Static code analysis
+- Security queries
+- Code scanning
 ```
 
 ### 2. SCA - Software Composition Analysis
 ```
-OWASP Dependency Check - Vulnerable Dependencies
-- Snyk
-- Black Duck
+Trivy / OWASP Dependency Check
+- Vulnerable dependencies
+- License issues
 ```
 
 ### 3. Container Scanning
 ```
 Trivy - CVE Scanning for Docker Images
-- Clair
-- Anchore
+- Base image vulnerabilities
+- Application packages
 ```
 
 ---
 
-# Slide 12: Alerting & Notifications
+# Slide 13: Alerting & Notifications
 
 ## 🚨 Alert Configuration
 
@@ -277,30 +304,22 @@ Trivy - CVE Scanning for Docker Images
 | Slack | Real-time team alerts | High |
 | Email | Detailed reports | Medium |
 | PagerDuty | Critical escalation | Critical |
-| Teams | Microsoft integration | Medium |
 
-### Jenkins Post Block:
-```groovy
-post {
-    success {
-        slackSend(channel: "#cicd-alerts", 
-                  color: "good", 
-                  message: "✅ Build #${BUILD_NUMBER} Success")
-    }
-    failure {
-        slackSend(channel: "#cicd-alerts",
-                  color: "danger",
-                  message: "❌ Build #${BUILD_NUMBER} FAILED!")
-        emailext(to: "devops@cdac.com",
-                subject: "ALERT: Build Failed",
-                body: "Check logs immediately")
-    }
-}
+### GitHub Actions Alert:
+```yaml
+- name: Send Slack Notification
+  if: failure()
+  uses: slackapi/slack-github-action@v1
+  with:
+    payload: |
+      {
+        "text": "❌ Build Failed: ${{ github.workflow }}"
+      }
 ```
 
 ---
 
-# Slide 13: Alert Thresholds
+# Slide 14: Alert Thresholds
 
 ```yaml
 ALERT_THRESHOLDS:
@@ -321,86 +340,84 @@ ESCALATION_RULES:
 
 ---
 
-# Slide 14: Project Structure
+# Slide 15: Project Structure
 
 ```
 cicd-demo/
+├── .github/
+│   └── workflows/              # GitHub Actions
+│       ├── ci-cd-pipeline.yml
+│       ├── security-scan.yml
+│       └── demo-build.yml
 ├── microservices/
-│   ├── user-service/       # Java Spring Boot
+│   ├── user-service/          # Java Spring Boot
 │   │   ├── src/main/java/
 │   │   ├── Dockerfile
-│   │   ├── pom.xml
-│   │   └── application.properties
+│   │   └── pom.xml
 │   ├── order-service/
 │   └── inventory-service/
 ├── jenkins/
-│   └── Jenkinsfile         # Main pipeline
+│   └── Jenkinsfile             # Jenkins pipeline
 ├── docker/
-│   ├── docker-compose.yml   # Local dev environment
-│   ├── nginx.conf          # Reverse proxy
-│   └── prometheus.yml      # Monitoring config
-├── alerts/                  # Notification configurations
-│   ├── alert-config.yaml
-│   ├── send-alert.sh
-│   └── slack-notification.groovy
-├── bitbucket/              # Webhook handlers
+│   ├── docker-compose.yml
+│   └── nginx.conf
+├── alerts/                      # Notification configs
 └── README.md
 ```
 
 ---
 
-# Slide 15: Live Demo
+# Slide 16: Live Demo
 
 ## 🎬 Demo Flow
 
-1. **Push code to Bitbucket** → Trigger pipeline
-2. **Webhook notifies Jenkins** → Pipeline starts
+1. **Push code to GitHub** → Trigger pipeline
+2. **GitHub Actions runs** → Pipeline starts
 3. **Pipeline executes stages** → Build, Test, Scan
 4. **Docker images built** → Containerization
-5. **Security scans run** → Trivy, SonarQube
+5. **Security scans run** → Trivy
 6. **Deploy to staging** → Kubernetes/Docker
 7. **Alert on success/failure** → Slack/Email
 
 ### Commands:
 ```bash
-# Start environment
-docker-compose up -d
+# Push to trigger
+git add . && git commit -m "demo" && git push
 
-# View logs
-docker-compose logs -f
+# Manual trigger
+gh workflow run demo-build.yml
 
-# Run pipeline
-curl -X POST JENKINS_URL/job/pipeline/build
+# View status
+gh run status
 ```
 
 ---
 
-# Slide 16: Key Commands
+# Slide 17: Key Commands
 
 ```bash
+# GitHub CLI
+gh workflow list
+gh run watch
+gh run download
+
 # Docker Commands
 docker build -t user-service:latest ./user-service
 docker-compose up -d
-docker-compose logs -f user-service
-docker inspect --format='{{.State.Health.Status}}' user-service
+docker-compose logs -f
 
 # Security Scanning
 trivy image user-service:latest
 trivy fs --severity HIGH,CRITICAL ./project
 
-# Jenkins
-jenkins-cli.jar build job-name -s
-curl -X POST JENKINS_URL/job/pipeline/build
-
 # Kubernetes
 kubectl apply -f deployment.yaml
-kubectl rollout status deployment/user-service
-kubectl get pods -l app=user-service
+kubectl get pods
 ```
 
 ---
 
-# Slide 17: Benefits
+# Slide 18: Benefits
 
 ## ✨ CI/CD Pipeline Benefits
 
@@ -413,44 +430,43 @@ kubectl get pods -l app=user-service
 
 ---
 
-# Slide 18: Key Takeaways
+# Slide 19: Key Takeaways
 
 ## 🎯 Remember
 
 1. **DevSecOps** = Development + Security + Operations integrated
-2. **Jenkins Pipeline** as Code for version-controlled CI/CD
-3. **Docker** enables consistent microservice deployment
-4. **Security** must be integrated throughout the pipeline
-5. **Alerting** ensures rapid response to failures
-6. **Automation** reduces human error and speeds delivery
+2. **GitHub Actions** = Free, built-in CI/CD for GitHub repos
+3. **Jenkins** = Alternative for enterprise CI/CD
+4. **Docker** = Consistent microservice deployment
+5. **Security** = Must be integrated throughout the pipeline
+6. **Alerting** = Ensures rapid response to failures
 
 ---
 
-# Slide 19: Resources
+# Slide 20: Resources
 
 ## 📚 Learning Resources
 
 ### Documentation:
-- Jenkins.io - Pipeline Documentation
-- Docker Docs - Best Practices
-- Bitbucket API - Webhooks
-- SonarQube - Code Analysis
-- Trivy - Container Scanning
+- docs.github.com/actions - GitHub Actions
+- docs.docker.com - Docker Best Practices
+- jenkins.io - Jenkins Documentation
+- aquasecurity.github.io/trivy - Trivy Scanner
 
 ### Practice:
-- Demo Repository: bitbucket.org/cdac-demo/cicd-demo
+- Demo Repository: github.com/anandpatil/cicd-demo
 - Hands-on Labs
 - Assignment: Build your own CI/CD pipeline
 
 ---
 
-# Slide 20: Thank You
+# Slide 21: Thank You
 
 ## 🙏 Questions?
 
 **Contact:**
 - 📧 Email: devops@cdac.com
 - 💬 Slack: #cdac-devsecops
-- 📦 Repo: bitbucket.org/cdac-demo/cicd-microservices
+- 📦 Repo: github.com/anandpatil/cicd-demo
 
 **Happy Learning! 🚀**
