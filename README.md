@@ -229,19 +229,39 @@ SPRING_PROFILES_ACTIVE: production
 
 ## 📚 Documentation
 
+- [🌐 Quick Start - GitHub Codespaces](CODESPACES-GUIDE.md)
 - [📊 Presentation Slides](docs/CDAC-DevSecOps-Slides.md)
 - [🌐 HTML Presentation](docs/CDAC-DevSecOps-Presentation.html) (open in browser)
 - [🔧 Setup Guide](SETUP.md)
+- [🔧 GitHub CICD Updates](github/GITHUB-CICD-UPDATES.md)
 - [🐳 Docker Guide](docker-compose.yml)
 - [☸️ Kubernetes Guide](k8s/)
 - [🐙 GitHub Setup](github/SETUP.md)
+- [⚙️ Makefile Commands](Makefile)
 
 ## 🎓 For CDAC Lecture
 
-1. Open `docs/CDAC-DevSecOps-Presentation.html` in browser
-2. Navigate with arrow keys
-3. Show the GitHub Actions tab during demo
-4. Trigger builds to show real-time pipeline
+### Using GitHub Codespaces (Recommended)
+1. Click "Code" button → "Codespaces" → "Create codespace on main"
+2. Wait for environment setup (~2 minutes)
+3. Run: `make dashboard`
+4. Open http://localhost:5000 to show live demo
+5. Trigger builds and show real-time monitoring
+6. Open GitHub Actions tab to show workflow runs
+
+### Using Local Setup
+1. Clone repository: `git clone https://github.com/anandpatil/cicd-demo.git`
+2. Run: `make services-start`
+3. Open dashboard: `make dashboard`
+4. Run demo script: `make start-demo`
+
+### Using GitHub Actions Tab
+1. Open Actions tab in GitHub repository
+2. Trigger demo: Click "Build Demo" workflow
+3. Watch pipeline execute in real-time
+4. Show logs and artifacts
+
+**[📖 Presentation Guide →](docs/CDAC-DevSecOps-Slides.md)**
 
 ## 🤝 Contributing
 
