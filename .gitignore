@@ -1,0 +1,52 @@
+# Git Ignore for CI/CD Projects
+.DS_Store
+*.class
+*.log
+*.tmp
+*.bak
+*.swp
+*.orig
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+dependency-reduced-pom.xml
+
+# Gradle
+.gradle/
+build/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+.vscode/
+
+# Docker
+.docker/
+
+# Environment files (NEVER commit secrets)
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+secrets.yml
+
+# Jenkins
+workspace/
+.jenkins/
+
+# Logs
+logs/
+*.log
+
+# Test reports
+test-output/
+surefire-reports/

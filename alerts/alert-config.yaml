@@ -1,0 +1,83 @@
+# Alert Configuration for CDAC DevSecOps Pipeline
+# This file configures alert thresholds and notification channels
+
+# Alert Thresholds
+ALERT_THRESHOLDS:
+  # Build Alerts
+  BUILD_FAILURE_THRESHOLD: 3        # Alert after 3 consecutive failures
+  BUILD_DURATION_WARNING: 30m        # Warn if build exceeds 30 minutes
+  BUILD_DURATION_CRITICAL: 1h        # Critical alert after 1 hour
+
+  # Security Alerts
+  CRITICAL_VULNERABILITIES: 0        # Fail on any critical CVEs
+  HIGH_VULNERABILITIES: 5            # Warn on 5+ high severity CVEs
+  MEDIUM_VULNERABILITIES: 20         # Warn on 20+ medium severity CVEs
+
+  # Deployment Alerts
+  DEPLOYMENT_TIMEOUT: 10m             # Alert if deployment exceeds 10 minutes
+  HEALTH_CHECK_FAILURES: 3           # Alert after 3 health check failures
+  REPLICA_COUNT_MIN: 2               # Minimum required replicas in production
+
+# Notification Channels
+NOTIFICATIONS:
+  SLACK:
+    enabled: true
+    channel: "#cicd-alerts"
+    webhook_url_secret: "slack-webhook-url"
+    
+  EMAIL:
+    enabled: true
+    recipients:
+      - devops-team@cdac.com
+      - developers@cdac.com
+    on_failure: true
+    on_success: false
+    on_unstable: true
+    
+  PAGERDUTY:
+    enabled: false
+    integration_key_secret: "pagerduty-key"
+    escalation_policy: "devops-escalation"
+    
+  MICROSOFT_TEAMS:
+    enabled: false
+    webhook_url_secret: "teams-webhook-url"
+    channel: "CI/CD Alerts"
+
+# Alert Filters
+ALERT_FILTERS:
+  # Don't alert for these branch patterns
+  ignore_branches:
+    - "dependabot/*"
+    - "feature/*"
+    - "WIP-*"
+    
+  # Alert only for these events
+  alert_on:
+    - build_failure
+    - build_success
+    - deployment_failure
+    - deployment_success
+    - security_scan_failed
+    - critical_vulnerability_found
+
+# Escalation Rules
+ESCALATION:
+  build_failure:
+    - level: 1
+      notify: "developers"
+      delay: 0m
+    - level: 2
+      notify: "devops-lead"
+      delay: 15m
+    - level: 3
+      notify: "on-call"
+      delay: 30m
+      
+  deployment_failure:
+    - level: 1
+      notify: "devops-team"
+      delay: 0m
+    - level: 2
+      notify: "on-call"
+      delay: 5m

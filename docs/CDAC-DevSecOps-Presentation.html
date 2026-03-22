@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevSecOps CI/CD Pipeline - CDAC Lecture</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/reveal.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/theme/black.css">
+    <style>
+        .reveal { font-size: 28px; }
+        .reveal h1 { font-size: 2.2em; color: #00D4FF; }
+        .reveal h2 { font-size: 1.6em; color: #FFD700; }
+        .reveal h3 { font-size: 1.3em; color: #00FF88; }
+        .reveal code { background: #333; padding: 5px 10px; border-radius: 5px; font-size: 0.8em; }
+        .reveal pre { width: 100%; font-size: 0.6em; }
+        .reveal .slides section { text-align: left; }
+        .reveal .title-slide { text-align: center !important; }
+        .highlight { color: #00FF88; font-weight: bold; }
+        .warning { color: #FF6B6B; }
+        .columns { display: flex; gap: 20px; }
+        .column { flex: 1; }
+        ul.spark-list { list-style: none; padding-left: 0; }
+        ul.spark-list li { padding: 10px 0; }
+        ul.spark-list li::before { content: "⚡ "; }
+        .architecture-box { background: rgba(0,212,255,0.1); border: 2px solid #00D4FF; border-radius: 10px; padding: 20px; margin: 20px 0; }
+        .flow-diagram { text-align: center; font-size: 0.7em; }
+        .pipeline-stage { background: #1a1a2e; border: 2px solid; border-radius: 8px; padding: 15px; margin: 10px; text-align: center; }
+        .stage-build { border-color: #FFD700; }
+        .stage-test { border-color: #00FF88; }
+        .stage-deploy { border-color: #00D4FF; }
+        .stage-alert { border-color: #FF6B6B; }
+    </style>
+</head>
+<body>
+    <div class="reveal">
+        <div class="slides">
+            
+            <!-- Slide 1: Title -->
+            <section class="title-slide">
+                <h1>🚀 DevSecOps CI/CD Pipeline</h1>
+                <h2>Jenkins + Docker + Bitbucket</h2>
+                <p style="margin-top: 40px;">For Microservices Architecture</p>
+                <p style="margin-top: 60px; color: #FFD700;">CDAC - Advanced Computing</p>
+                <p style="color: #00FF88;">Practical Demo & Implementation Guide</p>
+                <aside class="notes">Welcome to the DevSecOps CI/CD Pipeline lecture. This session covers Jenkins, Docker, and Bitbucket integration for microservices.</aside>
+            </section>
+
+            <!-- Slide 2: Agenda -->
+            <section>
+                <h2>📋 Agenda</h2>
+                <ul class="spark-list">
+                    <li>Introduction to DevSecOps & CI/CD</li>
+                    <li>Microservices Architecture Overview</li>
+                    <li>Jenkins Pipeline Setup</li>
+                    <li>Docker Containerization</li>
+                    <li>Bitbucket Integration</li>
+                    <li>Security Scanning (DevSecOps)</li>
+                    <li>Alerting & Notifications</li>
+                    <li>Live Demo</li>
+                </ul>
+            </section>
+
+            <!-- Slide 3: What is DevSecOps? -->
+            <section>
+                <h2>🔐 What is DevSecOps?</h2>
+                <div class="columns">
+                    <div class="column">
+                        <div class="architecture-box">
+                            <h3>Dev + Sec + Ops</h3>
+                            <p>Integrating Security at every stage of the pipeline</p>
+                        </div>
+                    </div>
+                    <div class="column">
+                        <ul>
+                            <li>✅ <span class="highlight">Shift-Left Security</span> - Security early in SDLC</li>
+                            <li>✅ Automated Security Scanning</li>
+                            <li>✅ Continuous Compliance</li>
+                            <li>✅ Rapid Feedback Loops</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 4: CI/CD Pipeline Overview -->
+            <section>
+                <h2>🔄 CI/CD Pipeline Flow</h2>
+                <div class="flow-diagram">
+                    <div class="pipeline-stage stage-build">📝 Code Commit<br/>Bitbucket</div>
+                    <div style="font-size:2em">→</div>
+                    <div class="pipeline-stage stage-build">🔨 Build<br/>Maven/Gradle</div>
+                    <div style="font-size:2em">→</div>
+                    <div class="pipeline-stage stage-test">🧪 Unit Tests<br/>JUnit</div>
+                    <div style="font-size:2em">→</div>
+                    <div class="pipeline-stage stage-test">🔍 Code Quality<br/>SonarQube</div>
+                    <div style="font-size:2em">→</div>
+                    <div class="pipeline-stage stage-deploy">🐳 Docker Build<br/>Containerize</div>
+                    <div style="font-size:2em">→</div>
+                    <div class="pipeline-stage stage-deploy">☸️ Deploy<br/>K8s/Docker</div>
+                </div>
+            </section>
+
+            <!-- Slide 5: Microservices Architecture -->
+            <section>
+                <h2>🏗️ Microservices Architecture</h2>
+                <pre>
+┌─────────────────────────────────────────────────────┐
+│                  Load Balancer                      │
+└─────────────────────────────────────────────────────┘
+           │              │              │
+     ┌─────▼─────┐ ┌─────▼─────┐ ┌─────▼─────┐
+     │  User     │ │  Order    │ │ Inventory │
+     │ Service   │ │ Service   │ │ Service   │
+     │  :8081    │ │  :8082    │ │  :8083    │
+     └───────────┘ └───────────┘ └───────────┘
+                </pre>
+                <p style="text-align:center; color: #FFD700;">Each service: Independent Deployment, Scaling, Technology Stack</p>
+            </section>
+
+            <!-- Slide 6: Jenkins Introduction -->
+            <section>
+                <h2>⚙️ Jenkins - The Automation Server</h2>
+                <div class="columns">
+                    <div class="column">
+                        <h3>Features</h3>
+                        <ul>
+                            <li>Open Source</li>
+                            <li>Plugin Ecosystem (1800+)</li>
+                            <li>Pipeline as Code</li>
+                            <li>Distributed Builds</li>
+                            <li>Blue/Green Deployments</li>
+                        </ul>
+                    </div>
+                    <div class="column">
+                        <h3>Key Plugins</h3>
+                        <ul>
+                            <li><code>Pipeline</code> - DSL for pipelines</li>
+                            <li><code>Docker Pipeline</code></li>
+                            <li><code>Slack Notification</code></li>
+                            <li><code>Email Extension</code></li>
+                            <li><code>SonarQube Scanner</code></li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 7: Jenkinsfile Structure -->
+            <section>
+                <h2>📄 Jenkinsfile Structure</h2>
+                <pre><code>pipeline {
+    agent any
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        stage('Build') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+        stage('Test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+        stage('Deploy') {
+            steps {
+                sh 'docker build && docker push'
+            }
+        }
+    }
+    
+    post {
+        failure {
+            slackSend(message: "Build Failed!")
+        }
+    }
+}</code></pre>
+            </section>
+
+            <!-- Slide 8: Docker Setup -->
+            <section>
+                <h2>🐳 Docker for Microservices</h2>
+                <h3>Dockerfile Best Practices</h3>
+                <pre><code># Multi-stage build
+FROM maven:3.9-eclipse-temurin-17 AS builder
+WORKDIR /app
+COPY pom.xml .
+RUN mvn dependency:go-offline
+COPY src ./src
+RUN mvn clean package
+
+# Runtime stage
+FROM eclipse-temurin:17-jre-alpine
+RUN addgroup -S app && adduser -S app -G app
+COPY --from=builder /app/target/*.jar app.jar
+USER app
+EXPOSE 8081
+HEALTHCHECK --interval=30s CMD curl -f health
+ENTRYPOINT ["java", "-jar", "app.jar"]</code></pre>
+            </section>
+
+            <!-- Slide 9: Docker Compose -->
+            <section>
+                <h2>📦 Docker Compose</h2>
+                <pre><code>version: '3.8'
+services:
+  user-service:
+    build: ./user-service
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      retries: 3
+    networks:
+      - microservices
+      
+  order-service:
+    build: ./order-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      user-service:
+        condition: service_healthy
+        
+networks:
+  microservices:
+    driver: bridge</code></pre>
+            </section>
+
+            <!-- Slide 10: Bitbucket Integration -->
+            <section>
+                <h2>🔗 Bitbucket Integration</h2>
+                <div class="columns">
+                    <div class="column">
+                        <h3>Webhook Events</h3>
+                        <ul>
+                            <li><code>repo:push</code> - Trigger on push</li>
+                            <li><code>pullrequest:created</code></li>
+                            <li><code>pullrequest:merged</code></li>
+                            <li><code>issue:created</code></li>
+                        </ul>
+                    </div>
+                    <div class="column">
+                        <h3>Jenkins Configuration</h3>
+                        <pre><code>Bitbucket Bucket Sources Plugin
+├── Auto-discover branches
+├── Build PRs automatically  
+└── Webhook management</code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 11: DevSecOps - Security Scanning -->
+            <section>
+                <h2>🔒 DevSecOps Security Pipeline</h2>
+                <div class="pipeline-stage stage-test" style="margin-bottom:20px;">
+                    <h3>Static Application Security Testing (SAST)</h3>
+                    <p>SonarQube - Code Quality & Security Hotspots</p>
+                </div>
+                <div class="pipeline-stage stage-alert" style="margin-bottom:20px;">
+                    <h3>Software Composition Analysis (SCA)</h3>
+                    <p>OWASP Dependency Check - Vulnerable Dependencies</p>
+                </div>
+                <div class="pipeline-stage stage-alert">
+                    <h3>Container Scanning</h3>
+                    <p>Trivy - CVE Scanning for Docker Images</p>
+                </div>
+            </section>
+
+            <!-- Slide 12: Alerting System -->
+            <section>
+                <h2>🚨 Alerting & Notifications</h2>
+                <div class="columns">
+                    <div class="column">
+                        <h3>Notification Channels</h3>
+                        <ul>
+                            <li><span class="highlight">Slack</span> - Real-time team alerts</li>
+                            <li><span class="highlight">Email</span> - Detailed reports</li>
+                            <li><span class="warning">PagerDuty</span> - Critical escalation</li>
+                            <li><span class="highlight">Teams</span> - Microsoft integration</li>
+                        </ul>
+                    </div>
+                    <div class="column">
+                        <h3>Alert Triggers</h3>
+                        <pre><code>post {
+    success {
+        slackSend("✅ Build Passed")
+    }
+    failure {
+        slackSend("❌ Build Failed!")
+        emailext("ALERT: Build Failed")
+    }
+}</code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 13: Alert Configuration -->
+            <section>
+                <h2>📊 Alert Configuration</h2>
+                <pre><code>NOTIFICATIONS:
+  SLACK:
+    enabled: true
+    channel: "#cicd-alerts"
+    events:
+      - build_failure      # Critical
+      - build_success       # Info
+      - security_scan_fail  # Critical
+      - deployment_failure  # High
+      
+  EMAIL:
+    enabled: true
+    recipients:
+      - devops-team@cdac.com
+      - developers@cdac.com
+    attachLog: true
+        
+ESCALATION:
+  build_failure:
+    level 1 → Developers (0 min)
+    level 2 → DevOps Lead (15 min)  
+    level 3 → On-Call (30 min)</code></pre>
+            </section>
+
+            <!-- Slide 14: Project Structure -->
+            <section>
+                <h2>📁 Project Structure</h2>
+                <pre><code>cicd-demo/
+├── microservices/
+│   ├── user-service/       # Java Spring Boot
+│   │   ├── src/
+│   │   ├── Dockerfile
+│   │   └── pom.xml
+│   ├── order-service/
+│   └── inventory-service/
+├── jenkins/
+│   └── Jenkinsfile        # Main pipeline
+├── docker/
+│   ├── docker-compose.yml  # Local dev
+│   ├── nginx.conf          # Load balancer
+│   └── prometheus.yml      # Monitoring
+├── alerts/                 # Notification configs
+├── bitbucket/              # Webhook handlers
+└── README.md</code></pre>
+            </section>
+
+            <!-- Slide 15: Live Demo -->
+            <section>
+                <h2>🎬 Live Demo Setup</h2>
+                <div class="architecture-box">
+                    <h3>Demo Flow</h3>
+                    <ol>
+                        <li>1️⃣ Push code to Bitbucket</li>
+                        <li>2️⃣ Webhook triggers Jenkins</li>
+                        <li>3️⃣ Pipeline executes stages</li>
+                        <li>4️⃣ Docker images built</li>
+                        <li>5️⃣ Security scans run</li>
+                        <li>6️⃣ Deploy to staging</li>
+                        <li>7️⃣ Alert on success/failure</li>
+                    </ol>
+                </div>
+                <p style="text-align:center; color: #00FF88;">Let's see it in action! 🚀</p>
+            </section>
+
+            <!-- Slide 16: Commands -->
+            <section>
+                <h2>⌨️ Key Commands</h2>
+                <pre><code># Start local environment
+docker-compose up -d
+
+# Run specific service
+docker-compose up user-service
+
+# View logs
+docker-compose logs -f order-service
+
+# Build Docker image
+docker build -t user-service:latest ./user-service
+
+# Run pipeline manually
+curl -X POST JENKINS_URL/job/pipeline/build
+
+# Check container health
+docker inspect --format='{{.State.Health.Status}}' user-service
+
+# Security scan
+trivy image user-service:latest</code></pre>
+            </section>
+
+            <!-- Slide 17: Benefits -->
+            <section>
+                <h2>✨ CI/CD Benefits</h2>
+                <div class="columns">
+                    <div class="column">
+                        <h3>Development</h3>
+                        <ul>
+                            <li>Faster iterations</li>
+                            <li>Early bug detection</li>
+                            <li>Consistent builds</li>
+                            <li>Automated testing</li>
+                        </ul>
+                    </div>
+                    <div class="column">
+                        <h3>Operations</h3>
+                        <ul>
+                            <li>Reduced deployment time</li>
+                            <li>Zero-downtime deploys</li>
+                            <li>Easy rollback</li>
+                            <li>Infrastructure as code</li>
+                        </ul>
+                    </div>
+                    <div class="column">
+                        <h3>Security</h3>
+                        <ul>
+                            <li>Automated security scans</li>
+                            <li>Compliance monitoring</li>
+                            <li>Vulnerability detection</li>
+                            <li>Secure by default</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 18: Key Takeaways -->
+            <section>
+                <h2>🎯 Key Takeaways</h2>
+                <ul class="spark-list">
+                    <li>DevSecOps = Development + Security + Operations</li>
+                    <li>Jenkins Pipeline as Code for version-controlled CI/CD</li>
+                    <li>Docker enables consistent microservice deployment</li>
+                    <li>Security must be integrated throughout the pipeline</li>
+                    <li>Alerting ensures rapid response to failures</li>
+                    <li>Automation reduces human error and speeds delivery</li>
+                </ul>
+            </section>
+
+            <!-- Slide 19: Resources -->
+            <section>
+                <h2>📚 Resources</h2>
+                <div class="columns">
+                    <div class="column">
+                        <h3>Documentation</h3>
+                        <ul>
+                            <li>Jenkins.io - Pipeline docs</li>
+                            <li>Docker Docs - Best practices</li>
+                            <li>Bitbucket API - Webhooks</li>
+                            <li>SonarQube - Code analysis</li>
+                        </ul>
+                    </div>
+                    <div class="column">
+                        <h3>Practice</h3>
+                        <ul>
+                            <li>GitHub: cdac-demo/cicd-demo</li>
+                            <li>Demo Environment Setup</li>
+                            <li>Hands-on Labs</li>
+                            <li>Assignment: Build your pipeline</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 20: Thank You -->
+            <section class="title-slide">
+                <h1>🙏 Thank You!</h1>
+                <h2 style="margin-top: 40px;">Questions?</h2>
+                <p style="margin-top: 60px;">
+                    <span style="color: #FFD700;">Email:</span> devops@cdac.com<br>
+                    <span style="color: #00FF88;">Slack:</span> #cdac-devsecops<br>
+                    <span style="color: #00D4FF;">Repo:</span> bitbucket.org/cdac-demo/cicd-microservices
+                </p>
+                <p style="margin-top: 40px; color: #FFD700;">Happy Learning! 🚀</p>
+            </section>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/reveal.js"></script>
+    <script>
+        Reveal.initialize({
+            hash: true,
+            slideNumber: true,
+            transition: 'slide',
+            transitionSpeed: 'default',
+            backgroundTransition: 'fade',
+            controls: true,
+            progress: true,
+            center: false,
+            width: 1280,
+            height: 720
+        });
+    </script>
+</body>
+</html>

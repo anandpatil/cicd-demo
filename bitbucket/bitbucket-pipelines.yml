@@ -1,0 +1,51 @@
+{
+    "repository": {
+        "uuid": "{your-repo-uuid}",
+        "full_name": "cdac-demo/cicd-microservices",
+        "name": "cicd-microservices",
+        "scm": "git",
+        "website": "",
+        "owner": {
+            "uuid": "{your-workspace-uuid}",
+            "username": "cdac-demo",
+            "display_name": "CDAC Demo"
+        }
+    },
+    "hook_settings": {
+        "webhook": {
+            "url": "https://jenkins.cdac-demo.com/bitbucket-hook/",
+            "secret": "your-webhook-secret",
+            "events": [
+                "repo:push",
+                "repo:fork",
+                "issue:created",
+                "issue:updated",
+                "pullrequest:created",
+                "pullrequest:updated",
+                "pullrequest:fulfilled"
+            ],
+            "active": true,
+            "description": "Jenkins CI/CD Pipeline Webhook"
+        }
+    },
+    "pipelines": {
+        "branches": {
+            "main": {
+                "on": true,
+                "trigger": "push"
+            },
+            "develop": {
+                "on": true,
+                "trigger": "push"
+            }
+        },
+        "pull-requests": {
+            "**": {
+                "on": true,
+                "required_statuses": [
+                    "CI/CD Pipeline"
+                ]
+            }
+        }
+    }
+}
