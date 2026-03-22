@@ -60,7 +60,23 @@ This is a comprehensive **DevSecOps CI/CD Pipeline** demo project showcasing:
 
 ## 🚀 Quick Start
 
-### Option 1: GitHub Actions (Recommended for Demo)
+### Option 1: GitHub Codespaces (🌟 Recommended - No Setup!)
+
+```bash
+# Click "Code" → "Codespaces" → "Create codespace on main"
+# Wait for environment to load (~2 minutes)
+
+# Then run:
+make dashboard
+# Open http://localhost:5000 in browser
+
+# Or try interactive demo:
+make start-demo
+```
+
+**[📖 Full Codespaces Guide →](CODESPACES-GUIDE.md)**
+
+### Option 2: GitHub Actions (Watch Pipeline)
 
 ```bash
 # 1. Fork/Clone this repository
@@ -75,7 +91,7 @@ git push -u origin main
 # Go to: https://github.com/anandpatil/cicd-demo/actions
 ```
 
-### Option 2: Docker Compose (Local Demo)
+### Option 3: Local Docker Compose
 
 ```bash
 # Start all services
