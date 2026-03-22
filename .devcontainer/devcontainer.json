@@ -1,0 +1,104 @@
+{
+  "name": "DevSecOps CI/CD Demo",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "moby": true
+    },
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "17",
+      "installMaven": true,
+      "mavenVersion": "3.9.0"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "18"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.makefile-tools",
+        "ms-vscode-remote.remote-containers",
+        "ms-vscode-remote.remote-ssh",
+        "ms-vscode.vscode-node-debug2",
+        "ms-vscode.azure-account",
+        "ms-vscode.github-copilot",
+        "redhat.vscode-yaml",
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "ms-docker.docker",
+        "ms-docker.vscode-docker",
+        "eamodio.gitlens",
+        "GitHub.copilot",
+        "GitLab.gitlab-workflow"
+      ],
+      "settings": {
+        "docker.showContextMenu": true,
+        "docker.commands.attach": "attachShell",
+        "editor.formatOnSave": true,
+        "files.autoSave": "afterDelay",
+        "[json]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[yaml]": {
+          "editor.defaultFormatter": "redhat.vscode-yaml"
+        }
+      }
+    }
+  },
+  "remoteEnv": {
+    "PATH": "${containerEnv:PATH}:/usr/local/go/bin",
+    "JAVA_HOME": "/usr/local/sdkman/candidates/java/current",
+    "MAVEN_HOME": "/usr/local/sdkman/candidates/maven/current"
+  },
+  "postCreateCommand": "bash scripts/setup-codespaces.sh",
+  "forwardPorts": [
+    8081,
+    8082,
+    8083,
+    80,
+    3000,
+    9090,
+    8080,
+    5000
+  ],
+  "portsAttributes": {
+    "8081": {
+      "label": "User Service",
+      "onAutoForward": "notify"
+    },
+    "8082": {
+      "label": "Order Service",
+      "onAutoForward": "notify"
+    },
+    "8083": {
+      "label": "Inventory Service",
+      "onAutoForward": "notify"
+    },
+    "80": {
+      "label": "Nginx/Dashboard",
+      "onAutoForward": "notify"
+    },
+    "3000": {
+      "label": "Grafana",
+      "onAutoForward": "notify"
+    },
+    "9090": {
+      "label": "Prometheus",
+      "onAutoForward": "notify"
+    },
+    "8080": {
+      "label": "Jenkins",
+      "onAutoForward": "notify"
+    },
+    "5000": {
+      "label": "Flask Dashboard",
+      "onAutoForward": "notify"
+    }
+  }
+}
