@@ -58,6 +58,7 @@ check_prerequisites() {
     print_section "Checking Prerequisites"
     
     local missing=0
+    local optional_missing=0
     
     # Check Docker
     if ! command -v docker &> /dev/null; then
@@ -72,15 +73,15 @@ check_prerequisites() {
         print_error "Java not found"
         missing=$((missing+1))
     else
-        print_success "Java $(java -version 2>&1 | grep -oP '(?<=")\d+' | head -1)"
+        print_success "Java $(java -version 2>&1 | head -1 | tail -1)"
     fi
     
-    # Check Maven
+    # Check Maven (Optional - only needed for build scenarios)
     if ! command -v mvn &> /dev/null; then
-        print_error "Maven not found"
-        missing=$((missing+1))
+        print_warning "Maven not found (optional for non-build scenarios)"
+        optional_missing=$((optional_missing+1))
     else
-        print_success "Maven $(mvn -v 2>&1 | head -1 | cut -d' ' -f3)"
+        print_success "Maven available"
     fi
     
     # Check git
@@ -88,12 +89,16 @@ check_prerequisites() {
         print_error "Git not found"
         missing=$((missing+1))
     else
-        print_success "Git $(git --version | cut -d' ' -f3)"
+        print_success "Git available"
     fi
     
     if [ $missing -gt 0 ]; then
-        print_error "Missing $missing prerequisites"
+        print_error "Missing $missing required prerequisites"
         return 1
+    fi
+    
+    if [ $optional_missing -gt 0 ]; then
+        print_warning "Some features may be limited without Maven"
     fi
 }
 
