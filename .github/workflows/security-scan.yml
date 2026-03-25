@@ -128,10 +128,17 @@ jobs:
           args: >
             --enableExperimental
             --scan ./microservices
+            
+      - name: List Generated Reports
+        if: always()
+        run: find . -name "*sarif" -o -name "*report*"
 
       - name: Upload Dependency Check Results
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('**/dependency-check-report.sarif') != ''
+        with:
+          sarif_file: 'dependency-check-report.sarif'
+          category: 'dependency-check'
         with:
           sarif_file: 'dependency-check-report.sarif'
           category: 'dependency-check'
