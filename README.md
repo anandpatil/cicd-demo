@@ -1,5 +1,4 @@
 # DevSecOps CI/CD Demo - README
-# testcommit
 <div align="center">
 
 ![DevSecOps](https://img.shields.io/badge/DevSecOps-CI%2FCD-blue)
