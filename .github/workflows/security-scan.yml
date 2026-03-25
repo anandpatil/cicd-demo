@@ -5,9 +5,9 @@ on:
     - cron: '0 0 * * 0'  # Weekly scan
   workflow_dispatch:
   push:
-    branches: [ main, develop ]
+    branches: [ main,master, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main ,master]
 
 jobs:
   trivy-scan:
@@ -28,7 +28,7 @@ jobs:
           output: 'trivy-fs-results.sarif'
 
       - name: Upload Trivy FS Results
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
           sarif_file: 'trivy-fs-results.sarif'
@@ -103,7 +103,7 @@ jobs:
           done
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+        uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
 
@@ -126,7 +126,7 @@ jobs:
             --scan ./microservices
 
       - name: Upload Dependency Check Results
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
           sarif_file: 'dependency-check-report.sarif'
