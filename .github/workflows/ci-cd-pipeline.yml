@@ -10,10 +10,8 @@ on:
 env:
   JAVA_VERSION: '17'
   DOCKER_REGISTRY: docker.io
-  REGISTRY_URL: https://hub.docker.com/repositories/patilad
-  username: patilad
-  password: Sigma$12
- 
+  REGISTRY_URL: docker.io
+
 jobs:
   build-and-test:
     name: Build & Test Microservices
