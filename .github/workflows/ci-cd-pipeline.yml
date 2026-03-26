@@ -10,9 +10,9 @@ on:
 env:
   JAVA_VERSION: '17'
   DOCKER_REGISTRY: docker.io
-  REGISTRY_URL: docker.io
-  username: ${{ secrets.DOCKER_USERNAME }}
-  password: ${{ secrets.DOCKER_TOKEN }}
+  REGISTRY_URL: https://hub.docker.com/repositories/patilad
+  username: patilad
+  password: Sigma$12
  
 jobs:
   build-and-test:
