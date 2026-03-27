@@ -106,7 +106,7 @@ jobs:
         id: user_meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY_URL }}/${{ secrets.DOCKER_ORG }}/user-service
+          images: ${{ env.REGISTRY_URL }}/patilad/user-service
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
@@ -116,7 +116,7 @@ jobs:
         id: order_meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY_URL }}/${{ secrets.DOCKER_ORG }}/order-service
+          images: ${{ env.REGISTRY_URL }}/patilad/order-service
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
@@ -126,7 +126,7 @@ jobs:
         id: inventory_meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY_URL }}/${{ secrets.DOCKER_ORG }}/inventory-service
+          images: ${{ env.REGISTRY_URL }}/patilad/inventory-service
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
@@ -136,7 +136,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./microservices/user-service
-          push: ${{ github.event_name == 'push' && secrets.DOCKER_USERNAME != '' }}
+          push: ${{ github.event_name == 'commit' }}
           tags: ${{ steps.user_meta.outputs.tags }}
           labels: ${{ steps.user_meta.outputs.labels }}
           cache-from: type=gha
@@ -146,7 +146,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./microservices/order-service
-          push: ${{ github.event_name == 'push' && secrets.DOCKER_USERNAME != '' }}
+          push: ${{ github.event_name == 'commit' && secrets.DOCKER_USERNAME != '' }}
           tags: ${{ steps.order_meta.outputs.tags }}
           labels: ${{ steps.order_meta.outputs.labels }}
           cache-from: type=gha
@@ -156,7 +156,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./microservices/inventory-service
-          push: ${{ github.event_name == 'push' && secrets.DOCKER_USERNAME != '' }}
+          push: ${{ github.event_name == 'commit' && secrets.DOCKER_USERNAME != '' }}
           tags: ${{ steps.inventory_meta.outputs.tags }}
           labels: ${{ steps.inventory_meta.outputs.labels }}
           cache-from: type=gha
