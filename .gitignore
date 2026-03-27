@@ -50,3 +50,5 @@ logs/
 # Test reports
 test-output/
 surefire-reports/
+.secrets.env
+*secrets*.env

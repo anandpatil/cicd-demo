@@ -12,7 +12,8 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SERVER_PORT=8081
-      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+      - MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED=true
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
       interval: 30s
@@ -35,7 +36,8 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
       - SERVER_PORT=8082
       - USER_SERVICE_URL=http://user-service:8081
-      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+      - MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED=true
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/actuator/health"]
       interval: 30s
@@ -60,7 +62,8 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SERVER_PORT=8083
-      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+      - MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED=true
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8083/actuator/health"]
       interval: 30s
@@ -105,6 +108,52 @@ services:
       - microservices-network
     restart: unless-stopped
 
+  # Loki for Log Aggregation
+  loki:
+    image: grafana/loki:2.9.10
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./docker/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+  # Promtail for Log Shipping (collects Docker container logs)
+  promtail:
+    image: grafana/promtail:2.9.10
+    container_name: promtail
+    volumes:
+      - ./docker/promtail-config.yaml:/etc/promtail/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/config.yaml
+    networks:
+      - microservices-network
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  # Tempo for Distributed Tracing
+  tempo:
+    image: grafana/tempo:2.4.2
+    container_name: tempo
+    ports:
+      - "3200:3200"   # HTTP REST
+      - "3201:3201"   # gRPC (for Grafana)
+      - "9411:9411"   # Zipkin receiver
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    volumes:
+      - ./docker/tempo-config.yaml:/etc/tempo/config.yaml:ro
+      - tempo-data:/var/tempo
+    command: -config.file=/etc/tempo/config.yaml
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
   # Grafana for Dashboards
   grafana:
     image: grafana/grafana:latest
@@ -113,12 +162,17 @@ services:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_APISERVER_ENABLED=false
+      - GF_LOG_LEVEL=warn
     volumes:
       - grafana-data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
     networks:
       - microservices-network
     depends_on:
       - prometheus
+      - loki
+      - tempo
     restart: unless-stopped
 
 networks:
@@ -129,3 +183,7 @@ networks:
 volumes:
   grafana-data:
     name: grafana-data
+  loki-data:
+    name: loki-data
+  tempo-data:
+    name: tempo-data
