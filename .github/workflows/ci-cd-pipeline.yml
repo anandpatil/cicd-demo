@@ -10,7 +10,7 @@ on:
 env:
   JAVA_VERSION: '17'
   DOCKER_REGISTRY: docker.io
-  REGISTRY_URL: docker.io/
+  REGISTRY_URL: docker.io
 
 jobs:
   build-and-test:
