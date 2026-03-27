@@ -10,7 +10,7 @@ on:
 env:
   JAVA_VERSION: '17'
   DOCKER_REGISTRY: docker.io
-  REGISTRY_URL: docker.io
+  REGISTRY_URL: docker.io/
 
 jobs:
   build-and-test:
@@ -83,7 +83,7 @@ jobs:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest
     needs: security-scan
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'commit' && github.ref == 'refs/heads/master'
     outputs:
       user_image: ${{ steps.user_meta.outputs.tags }}
       order_image: ${{ steps.order_meta.outputs.tags }}
@@ -106,7 +106,7 @@ jobs:
         id: user_meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY_URL }}/patilad/user-service
+          images: ${{ env.REGISTRY_URL }}/patilad/demo/user-service
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
@@ -116,7 +116,7 @@ jobs:
         id: order_meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY_URL }}/patilad/order-service
+          images: ${{ env.REGISTRY_URL }}/patilad/demo/order-service
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
@@ -126,7 +126,7 @@ jobs:
         id: inventory_meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY_URL }}/patilad/inventory-service
+          images: ${{ env.REGISTRY_URL }}/patilad/demo/inventory-service
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
@@ -136,12 +136,12 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./microservices/user-service
-          push: ${{ github.event_name == 'commit' }}
+          push: true
           tags: ${{ steps.user_meta.outputs.tags }}
           labels: ${{ steps.user_meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
+          
       - name: Build and Push Order Service
         uses: docker/build-push-action@v5
         with:
