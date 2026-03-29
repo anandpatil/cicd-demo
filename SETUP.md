@@ -41,37 +41,54 @@ curl http://localhost:8083/api/inventory/health
 
 ## Jenkins Setup
 
-### 1. Install Jenkins
+### 1. Start Jenkins from the bundled WAR
 ```bash
-docker run -d \
-  --name jenkins \
-  -p 8080:8080 \
-  -p 50000:50000 \
-  -v jenkins_home:/var/jenkins_home \
-  jenkins/jenkins:lts
+cd cicd-demo
+java -jar jenkins/jenkins.war --httpPort=8080
+```
+
+Open `http://localhost:8080` and unlock Jenkins with the initial admin password from:
+
+```text
+Windows: %USERPROFILE%\.jenkins\secrets\initialAdminPassword
+Linux/macOS: ~/.jenkins/secrets/initialAdminPassword
 ```
 
 ### 2. Install Required Plugins
 - Pipeline
-- Docker Pipeline
-- Slack Notification
-- Email Extension
-- SonarQube Scanner
-- Bitbucket Branch Source
+- Git
+- Credentials Binding
+- JUnit
+- Workspace Cleanup
 
 ### 3. Configure Jenkins Credentials
 1. Go to Jenkins > Manage Jenkins > Manage Credentials
 2. Add:
-   - Docker Hub credentials
-   - Bitbucket App Password
-   - Slack Webhook URL
-   - SonarQube Token
+  - Username/Password credential with ID `dockerhub-creds` for Docker Hub
 
-### 4. Create Pipeline Job
+### 4. Prepare the Jenkins agent machine
+- Install Java 17+
+- Install Maven 3.9+
+- Install Docker and ensure `docker` works for the Jenkins user
+- Install `kubectl` and make sure the Jenkins user has a working kubeconfig
+
+### 5. Create Pipeline Job
 1. New Item > Pipeline
 2. Select "Pipeline script from SCM"
-3. Configure Bitbucket repository
-4. Add Jenkinsfile path
+3. Configure your Git repository URL
+4. Set Script Path to `jenkins/Jenkinsfile`
+5. Build with parameters:
+  - `SERVICE=all`
+  - `K8S_NAMESPACE=staging` or `production`
+  - `PUSH_IMAGES=true`
+  - `DEPLOY_TO_K8S=true`
+
+### 6. What this pipeline does
+- Builds and tests `user-service`, `order-service`, and `inventory-service`
+- Builds Docker images for all selected services
+- Pushes versioned and `latest` tags to Docker Hub
+- Applies the Kubernetes manifests for the selected namespace
+- Updates each deployment to the newly built image and waits for rollout to finish
 
 ## Bitbucket Webhook Setup
 

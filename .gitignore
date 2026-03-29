@@ -41,14 +41,16 @@ secrets.yml
 
 # Jenkins
 workspace/
-.jenkins/
-
+.jenkins-home/
+.devcontainer/
 # Logs
 logs/
 *.log
-
+.temp*
+.tmp*
 # Test reports
 test-output/
 surefire-reports/
 .secrets.env
 *secrets*.env
+.jenkins-home/config.xml

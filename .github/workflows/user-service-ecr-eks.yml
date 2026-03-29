@@ -1,0 +1,135 @@
+name: User Service - ECR Push and EKS Deploy
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'microservices/user-service/**'
+      - '.github/workflows/user-service-ecr-eks.yml'
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Optional image tag override (default: commit SHA)'
+        required: false
+        type: string
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: demo-cicd
+  EKS_NAMESPACE: production
+  APP_NAME: user-service
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-push-deploy:
+    name: Build, Push to ECR, Deploy to EKS
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.30.0'
+
+      - name: Resolve image tag
+        id: vars
+        run: |
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            TAG="${{ github.event.inputs.image_tag }}"
+          else
+            TAG="${GITHUB_SHA::12}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "image_uri=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names "${{ env.ECR_REPOSITORY }}" >/dev/null 2>&1 || \
+          aws ecr create-repository --repository-name "${{ env.ECR_REPOSITORY }}"
+
+      - name: Build and push user-service image
+        working-directory: microservices/user-service
+        env:
+          IMAGE_URI: ${{ steps.vars.outputs.image_uri }}
+        run: |
+          docker build -t "$IMAGE_URI" .
+          docker push "$IMAGE_URI"
+
+      - name: Update kubeconfig for EKS
+        env:
+          EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+        run: |
+          aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "${{ env.AWS_REGION }}"
+
+      - name: Deploy user-service to EKS
+        env:
+          IMAGE_URI: ${{ steps.vars.outputs.image_uri }}
+        run: |
+          kubectl create namespace "${{ env.EKS_NAMESPACE }}" --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl -n "${{ env.EKS_NAMESPACE }}" apply -f - <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: user-service
+            labels:
+              app: user-service
+          spec:
+            replicas: 2
+            selector:
+              matchLabels:
+                app: user-service
+            template:
+              metadata:
+                labels:
+                  app: user-service
+              spec:
+                containers:
+                - name: user-service
+                  image: ${IMAGE_URI}
+                  ports:
+                  - containerPort: 8081
+                  env:
+                  - name: SPRING_PROFILES_ACTIVE
+                    value: production
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: user-service
+          spec:
+            selector:
+              app: user-service
+            ports:
+            - protocol: TCP
+              port: 8081
+              targetPort: 8081
+            type: LoadBalancer
+          EOF
+
+          kubectl -n "${{ env.EKS_NAMESPACE }}" rollout status deployment/user-service --timeout=300s
+
+      - name: Output deployment info
+        env:
+          IMAGE_URI: ${{ steps.vars.outputs.image_uri }}
+        run: |
+          echo "Deployed image: $IMAGE_URI"
+          kubectl -n "${{ env.EKS_NAMESPACE }}" get deploy user-service
+          kubectl -n "${{ env.EKS_NAMESPACE }}" get svc user-service

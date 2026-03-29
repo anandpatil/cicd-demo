@@ -1,0 +1,121 @@
+
+
+
+
+$env:JENKINS_HOME = "$PWD\.jenkins-home"; if (-not (Test-Path $env:JENKINS_HOME)) { New-Item -ItemType Directory -Path $env:JENKINS_HOME | Out-Null }; java --% -Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true -jar .\jenkins\jenkins.war --httpPort=8080
+
+Kubernetes - Deploy user-service and forward port
+=================================================
+Use this to point kubectl to Docker Desktop local Kubernetes:
+
+Show contexts:
+kubectl config get-contexts
+
+Switch to local Docker context:
+kubectl config use-context docker-desktop
+
+Verify:
+kubectl config current-context
+Step 1: Create the deployment
+kubectl create deployment user-service --image=cdacdemo/user-service:latest
+
+Step 2: Verify the pod is Running (wait until STATUS = Running)
+kubectl get pods -n default
+
+Step 3: Expose the deployment as a NodePort service
+kubectl expose deployment user-service --type=NodePort --port=8081 -n default
+
+Step 4: Verify the service was created
+kubectl get svc user-service -n default
+
+Step 5: Forward localhost port 8081 to the service (run in a separate terminal)
+kubectl port-forward svc/user-service 8081:8081 -n default
+or 
+while ($true) { kubectl port-forward svc/user-service 8081:8081 -n default; Start-Sleep -Seconds 2 }
+Alternative: keep the port-forward alive and auto-restart it if it drops
+powershell -ExecutionPolicy Bypass -File .\scripts\keep-port-forward.ps1 -Namespace default -Service user-service -LocalPort 8081 -RemotePort 8081
+
+Step 6: Test the service is reachable
+curl http://127.0.0.1:8081/actuator/health
+# Expected: {"status":"UP","groups":["liveness","readiness"]}
+
+Notes:
+- NodePort does NOT work from Windows when using a Kind cluster (Docker Desktop limitation)
+- Port-forward is the reliable way to access services on localhost with Kind
+- If port-forward dies, repeat Step 5 to restart it
+
+
+Jenkins (jenkins.war) - Run and setup CI/CD pipeline
+=====================================================
+
+Step 1: Run Jenkins from jenkins.war (repo-local Jenkins home)
+
+$env:JENKINS_HOME = "$PWD\.jenkins-home"
+if (-not (Test-Path $env:JENKINS_HOME)) { New-Item -ItemType Directory -Path $env:JENKINS_HOME | Out-Null }
+java --% -Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true -jar .\jenkins\jenkins.war --httpPort=8080
+Step 2: Open Jenkins
+http://127.0.0.1:8080
+
+Step 3: Unlock Jenkins
+Get-Content .\.jenkins-home\secrets\initialAdminPassword
+
+Step 4: Install plugins (Manage Jenkins -> Plugins)
+Pipeline
+Git
+Credentials Binding
+JUnit
+Workspace Cleanup
+
+Step 5: Add Docker Hub credentials (Manage Jenkins -> Credentials)
+Type: Username with password
+ID: dockerhub-creds
+
+Step 6: Create pipeline job
+New Item -> Pipeline -> Name: cicd-microservices
+Pipeline section:
+- Definition: Pipeline script from SCM
+- SCM: Git
+- Repository URL: D:/anand/work/projects/cicd-demo
+- Branches to build:
+	*/master
+	*/feature/devopsChanges
+- Script Path: jenkins/Jenkinsfile
+
+Step 7: Build with parameters
+SERVICE=all
+K8S_NAMESPACE=staging
+PUSH_IMAGES=true
+DEPLOY_TO_K8S=true
+DOCKER_CREDENTIALS_ID=dockerhub-creds
+
+Step 8: Trigger build
+Build with Parameters
+
+Step 9: Verify deployment
+kubectl get deployments -n staging
+kubectl get svc -n staging
+
+
+AWS
+aws ecr create-repository --repository-name demo-cicd --region ap-south-1
+aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 382934810814.dkr.ecr.ap-south-1.amazonaws.com
+
+# Tag the local image with the ECR repository URI
+docker tag cicd-demo-user-service:local 382934810814.dkr.ecr.ap-south-1.amazonaws.com/demo-cicd:user-service
+
+# Push to ECR
+docker push 382934810814.dkr.ecr.ap-south-1.amazonaws.com/demo-cicd:user-service
+
+kubectl proxy
+
+# Access via
+curl http://localhost:8001/api/v1/namespaces/<namespace>/services/user-service:8081/proxy/actuator/health
+
+# Get the pod name first
+kubectl get pods -n default
+
+# Port forward
+kubectl port-forward svc/user-service 8081:8081 -n default
+
+# Test
+curl http://localhost:8081/actuator/health

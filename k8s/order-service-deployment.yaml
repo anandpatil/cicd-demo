@@ -56,9 +56,11 @@ spec:
   selector:
     app: order-service
   ports:
-  - port: 80
+  - name: http
+    port: 80
     targetPort: 8082
-  type: ClusterIP
+    nodePort: 30082
+  type: NodePort
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
