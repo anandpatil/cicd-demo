@@ -65,7 +65,7 @@ where codeql >nul 2>nul || exit /b 1
 
         stage('Unit Tests And Coverage') {
             steps {
-                dir('microservices/user-service') {
+                dir('apps/microservices/user-service') {
                     script {
                         if (isUnix()) {
                             sh "mvn ${env.MAVEN_ARGS} clean verify"
@@ -79,7 +79,7 @@ where codeql >nul 2>nul || exit /b 1
 
         stage('CodeQL Analysis') {
             steps {
-                dir('microservices/user-service') {
+                dir('apps/microservices/user-service') {
                     script {
                         if (isUnix()) {
                             sh '''#!/bin/sh
@@ -142,8 +142,8 @@ Write-Output "CodeQL error-level findings: 0"
 
     post {
         always {
-            junit allowEmptyResults: true, testResults: 'microservices/user-service/target/surefire-reports/*.xml'
-            archiveArtifacts allowEmptyArchive: true, artifacts: 'microservices/user-service/target/site/jacoco/**, codeql-user-service.sarif'
+            junit allowEmptyResults: true, testResults: 'apps/microservices/user-service/target/surefire-reports/*.xml'
+            archiveArtifacts allowEmptyArchive: true, artifacts: 'apps/microservices/user-service/target/site/jacoco/**, codeql-user-service.sarif'
             cleanWs()
         }
     }

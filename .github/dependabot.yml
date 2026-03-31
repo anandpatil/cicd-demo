@@ -2,7 +2,7 @@ version: 2
 updates:
   # Enable Dependabot for Maven dependencies
   - package-ecosystem: "maven"
-    directory: "/microservices/user-service"
+    directory: "/apps/microservices/user-service"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -21,7 +21,7 @@ updates:
       - dependency-type: "all"
 
   - package-ecosystem: "maven"
-    directory: "/microservices/order-service"
+    directory: "/apps/microservices/order-service"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -34,7 +34,7 @@ updates:
       - "maven"
 
   - package-ecosystem: "maven"
-    directory: "/microservices/inventory-service"
+    directory: "/apps/microservices/inventory-service"
     schedule:
       interval: "weekly"
       day: "monday"

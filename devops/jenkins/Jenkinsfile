@@ -13,8 +13,8 @@ pipeline {
         choice(name: 'SERVICE', choices: ['all', 'user-service', 'order-service', 'inventory-service'], description: 'Service to build and deploy locally')
         choice(name: 'K8S_NAMESPACE', choices: ['default', 'staging', 'production'], description: 'Local Kubernetes namespace to deploy into')
         string(name: 'LOCAL_REPO_PATH', defaultValue: 'D:/anand/work/projects/cicd-demo', description: 'Absolute path to the local repository used by Jenkins')
-        booleanParam(name: 'DEPLOY_TO_K8S', defaultValue: true, description: 'Deploy built images to the local Kubernetes cluster')
-        booleanParam(name: 'ENABLE_SONAR_GATE', defaultValue: false, description: 'Run Sonar analysis for user-service and fail build when quality gate fails')
+        booleanParam(name: 'DEPLOY_TO_K8S', defaultValue: false, description: 'Deploy built images to the local Kubernetes cluster')
+        booleanParam(name: 'ENABLE_SONAR_GATE', defaultValue: true, description: 'Run Sonar analysis for user-service and fail build when quality gate fails')
         string(name: 'SONAR_HOST_URL', defaultValue: 'https://sonarcloud.io/', description: 'SonarQube/SonarCloud URL (required when ENABLE_SONAR_GATE=true)')
         string(name: 'SONAR_PROJECT_KEY', defaultValue: 'anandpatil_cicd-demo', description: 'Sonar project key for user-service')
         string(name: 'SONAR_ORGANIZATION_KEY', defaultValue: 'college-demo', description: 'Sonar organization key for user-service')
@@ -27,7 +27,7 @@ pipeline {
         MVN_CMD_WIN = 'D:/anand/work/swtools/mvn/bin/mvn.cmd'
         ALL_SERVICES = 'user-service,order-service,inventory-service'
         LOCAL_IMAGE_PREFIX = 'cicd-demo'
-        K8S_MANIFEST_DIR = 'k8s'
+        K8S_MANIFEST_DIR = 'devops/k8s'
     }
 
     stages {
@@ -42,10 +42,10 @@ pipeline {
                     currentBuild.displayName = "#${env.BUILD_NUMBER} ${params.SERVICE} local"
 
                     if (isUnix()) {
-                        sh "test -f '${env.REPO_PATH}/jenkins/Jenkinsfile'"
+                        sh "test -f '${env.REPO_PATH}/devops/jenkins/Jenkinsfile'"
                     } else {
                         bat """@echo off
-if not exist "${env.REPO_PATH_WIN}\\jenkins\\Jenkinsfile" exit /b 1
+if not exist "${env.REPO_PATH_WIN}\\devops\\jenkins\\Jenkinsfile" exit /b 1
 """
                     }
 
@@ -131,7 +131,7 @@ for /f %%I in ('kubectl config current-context') do @echo ACTIVE_CONTEXT=%%I
                     def services = env.SELECTED_SERVICES.tokenize(',')
                     def branches = services.collectEntries { service ->
                         [(service): {
-                            dir("${env.REPO_PATH_WIN}\\microservices\\${service}") {
+                            dir("${env.REPO_PATH_WIN}\\apps\\microservices\\${service}") {
                                 if (isUnix()) {
                                     sh "mvn ${env.MAVEN_ARGS} clean verify"
                                 } else {
@@ -161,7 +161,7 @@ for /f %%I in ('kubectl config current-context') do @echo ACTIVE_CONTEXT=%%I
                         error('SONAR_TOKEN is required when ENABLE_SONAR_GATE=true')
                     }
 
-                    dir("${env.REPO_PATH_WIN}\\microservices\\user-service") {
+                    dir("${env.REPO_PATH_WIN}\\apps\\microservices\\user-service") {
                         if (isUnix()) {
                             sh """mvn ${env.MAVEN_ARGS} verify sonar:sonar \
   -Dsonar.projectKey=${params.SONAR_PROJECT_KEY} \
@@ -183,7 +183,7 @@ for /f %%I in ('kubectl config current-context') do @echo ACTIVE_CONTEXT=%%I
             }
             steps {
                 script {
-                    dir("${env.REPO_PATH_WIN}\\microservices\\user-service") {
+                    dir("${env.REPO_PATH_WIN}\\apps\\microservices\\user-service") {
                         if (isUnix()) {
                             sh '''#!/bin/sh
 set -eu
@@ -233,7 +233,7 @@ if errorlevel 1 exit /b 1
                     def services = env.SELECTED_SERVICES.tokenize(',')
                     def branches = services.collectEntries { service ->
                         [(service): {
-                            dir("${env.REPO_PATH_WIN}\\microservices\\${service}") {
+                            dir("${env.REPO_PATH_WIN}\\apps\\microservices\\${service}") {
                                 def localImage = "${env.LOCAL_IMAGE_PREFIX}-${service}:${env.IMAGE_TAG}"
                                 def demoAlias = "${env.LOCAL_IMAGE_PREFIX}-${service}:local"
 

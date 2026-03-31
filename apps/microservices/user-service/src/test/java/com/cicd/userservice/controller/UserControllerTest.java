@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -78,5 +79,17 @@ class UserControllerTest {
         assertNotNull(response.getBody());
         assertEquals("3", response.getBody().getId());
         verify(userService).createUser(input);
+    }
+
+    @Test
+    void healthReturnsServiceHealth() {
+        Map<String, String> expected = Map.of("status", "UP", "service", "user-service");
+        when(userService.health()).thenReturn(expected);
+
+        Map<String, String> response = userController.health();
+
+        assertEquals("UP", response.get("status"));
+        assertEquals("user-service", response.get("service"));
+        verify(userService).health();
     }
 }

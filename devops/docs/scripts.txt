@@ -1,8 +1,43 @@
+Maven - Local Demo Commands
+===========================
+
+Pre-check
+---------
+mvn -v
+
+Run from repo root (all services)
+---------------------------------
+cd D:/anand/work/projects/cicd-demo
+
+Build without tests (fast demo build)
+mvn clean install 
+mvn -B -ntp -f apps/microservices/user-service/pom.xml clean package -DskipTests
+mvn -B -ntp -f apps/microservices/order-service/pom.xml clean package -DskipTests
+mvn -B -ntp -f apps/microservices/inventory-service/pom.xml clean package -DskipTests
+
+Run unit tests for each service
+mvn -B -ntp -f apps/microservices/user-service/pom.xml test
+mvn -B -ntp -f apps/microservices/order-service/pom.xml test
+mvn -B -ntp -f apps/microservices/inventory-service/pom.xml test
+
+Full verify (includes JaCoCo checks configured in user-service)
+mvn -B -ntp -f apps/microservices/user-service/pom.xml clean verify
+
+SonarCloud scan (user-service)
+mvn -B -ntp -f apps/microservices/user-service/pom.xml verify sonar:sonar -Dsonar.projectKey=anandpatil_cicd-demo -Dsonar.organization=college-demo -Dsonar.host.url=https://sonarcloud.io/ -Dsonar.token=<SONAR_TOKEN> -Dsonar.qualitygate.wait=true
+
+CodeQL database create (user-service)
+codeql database create temp --language=java --source-root apps/microservices/user-service --command "mvn -B -ntp -f apps/microservices/user-service/pom.xml -DskipTests=true clean compile"
+
+Reference links
+---------------
+https://mvnrepository.com/repos/central
+https://owasp.org/www-project-top-ten/
+
+Docker build
+hub.docker.com/repository/docker/patilad/demo
 
 
-
-
-$env:JENKINS_HOME = "$PWD\.jenkins-home"; if (-not (Test-Path $env:JENKINS_HOME)) { New-Item -ItemType Directory -Path $env:JENKINS_HOME | Out-Null }; java --% -Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true -jar .\jenkins\jenkins.war --httpPort=8080
 
 Kubernetes - Deploy user-service and forward port
 =================================================
@@ -49,10 +84,10 @@ Jenkins (jenkins.war) - Run and setup CI/CD pipeline
 =====================================================
 
 Step 1: Run Jenkins from jenkins.war (repo-local Jenkins home)
+cd devops
+$env:JENKINS_HOME = "$PWD\.jenkins-home" 
+if (-not (Test-Path $env:JENKINS_HOME)) { New-Item -ItemType Directory -Path $env:JENKINS_HOME | Out-Null } java --% -Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true -jar .\jenkins\jenkins.war --httpPort=8080
 
-$env:JENKINS_HOME = "$PWD\.jenkins-home"
-if (-not (Test-Path $env:JENKINS_HOME)) { New-Item -ItemType Directory -Path $env:JENKINS_HOME | Out-Null }
-java --% -Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true -jar .\jenkins\jenkins.war --httpPort=8080
 Step 2: Open Jenkins
 http://127.0.0.1:8080
 
@@ -119,3 +154,5 @@ kubectl port-forward svc/user-service 8081:8081 -n default
 
 # Test
 curl http://localhost:8081/actuator/health
+
+

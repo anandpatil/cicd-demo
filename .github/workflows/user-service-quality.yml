@@ -4,12 +4,12 @@ on:
   push:
     branches: [ main, develop, 'feature/**' ]
     paths:
-      - 'microservices/user-service/**'
+      - 'apps/microservices/user-service/**'
       - '.github/workflows/user-service-quality.yml'
   pull_request:
     branches: [ main ]
     paths:
-      - 'microservices/user-service/**'
+      - 'apps/microservices/user-service/**'
       - '.github/workflows/user-service-quality.yml'
   workflow_dispatch:
 
@@ -30,7 +30,7 @@ jobs:
           cache: 'maven'
 
       - name: Run Tests and JaCoCo Check
-        working-directory: microservices/user-service
+        working-directory: apps/microservices/user-service
         run: mvn -B clean verify
 
       - name: Upload Coverage Reports
@@ -39,8 +39,8 @@ jobs:
         with:
           name: user-service-coverage
           path: |
-            microservices/user-service/target/site/jacoco/
-            microservices/user-service/target/surefire-reports/
+            apps/microservices/user-service/target/site/jacoco/
+            apps/microservices/user-service/target/surefire-reports/
 
   sonar-quality-gate:
     name: Sonar Quality Gate
@@ -60,7 +60,7 @@ jobs:
           cache: 'maven'
 
       - name: Sonar Scan (User Service)
-        working-directory: microservices/user-service
+        working-directory: apps/microservices/user-service
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: >
@@ -95,7 +95,7 @@ jobs:
           cache: 'maven'
 
       - name: Build User Service
-        working-directory: microservices/user-service
+        working-directory: apps/microservices/user-service
         run: mvn -B clean package -DskipTests=true
 
       - name: Analyze

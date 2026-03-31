@@ -43,13 +43,13 @@ help:
 
 setup:
 	@echo "$(BLUE)Setting up Codespaces environment...$(NC)"
-	@bash scripts/setup-codespaces.sh
+	@bash devops/scripts/setup-codespaces.sh
 
 clean:
 	@echo "$(BLUE)Cleaning build artifacts...$(NC)"
-	@for service in microservices/*/; do \
+	@for service in apps/microservices/*/; do \
 		cd $$service && mvn clean > /dev/null 2>&1; \
-		cd ../../; \
+		cd ../../../../; \
 	done
 	@find . -type d -name target -exec rm -rf {} + 2>/dev/null || true
 	@docker system prune -f 2>/dev/null || true
@@ -58,13 +58,13 @@ clean:
 ## Demo Commands
 
 start-demo:
-	@bash scripts/demo.sh menu
+	@bash devops/scripts/demo.sh menu
 
 demo-build:
-	@bash scripts/demo.sh build
+	@bash devops/scripts/demo.sh build
 
 demo-logs:
-	@bash scripts/demo.sh logs
+	@bash devops/scripts/demo.sh logs
 
 ## Local Services
 
@@ -94,7 +94,7 @@ services-logs:
 dashboard:
 	@echo "$(BLUE)Starting dashboard...$(NC)"
 	@echo "$(GREEN)✓ Dashboard available at: http://localhost:5000$(NC)"
-	@cd scripts && python3 -m flask --app dashboard run --host=0.0.0.0
+	@cd devops/scripts && python3 -m flask --app dashboard run --host=0.0.0.0
 
 ## Build & Test
 
@@ -102,29 +102,29 @@ build:
 	@echo "$(BLUE)Building all microservices...$(NC)"
 	@for service in user-service order-service inventory-service; do \
 		echo "$(BLUE)Building $$service...$(NC)"; \
-		cd microservices/$$service && \
+		cd apps/microservices/$$service && \
 		mvn clean package -DskipTests=true -q && \
 		echo "$(GREEN)✓ $$service built$(NC)" || echo "✗ Build failed"; \
-		cd ../../; \
+		cd ../../../; \
 	done
 
 test:
 	@echo "$(BLUE)Running tests...$(NC)"
 	@for service in user-service order-service inventory-service; do \
 		echo "$(BLUE)Testing $$service...$(NC)"; \
-		cd microservices/$$service && \
+		cd apps/microservices/$$service && \
 		mvn test -q && \
 		echo "$(GREEN)✓ $$service tests passed$(NC)" || echo "✗ Tests failed"; \
-		cd ../../; \
+		cd ../../../; \
 	done
 
 docker-build:
 	@echo "$(BLUE)Building Docker images...$(NC)"
-	@docker build -t user-service:latest -q ./microservices/user-service
+	@docker build -t user-service:latest -q ./apps/microservices/user-service
 	@echo "$(GREEN)✓ user-service:latest$(NC)"
-	@docker build -t order-service:latest -q ./microservices/order-service
+	@docker build -t order-service:latest -q ./apps/microservices/order-service
 	@echo "$(GREEN)✓ order-service:latest$(NC)"
-	@docker build -t inventory-service:latest -q ./microservices/inventory-service
+	@docker build -t inventory-service:latest -q ./apps/microservices/inventory-service
 	@echo "$(GREEN)✓ inventory-service:latest$(NC)"
 
 ## Security
@@ -186,7 +186,7 @@ info:
 	@git rev-parse --abbrev-ref HEAD
 	@echo ""
 	@echo "Microservices:"
-	@ls microservices/
+	@ls apps/microservices/
 	@echo ""
 	@echo "Workflows:"
 	@ls .github/workflows/

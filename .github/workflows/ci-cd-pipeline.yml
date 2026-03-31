@@ -32,11 +32,11 @@ jobs:
           cache: 'maven'
 
       - name: Build ${{ matrix.service }}
-        working-directory: ./microservices/${{ matrix.service }}
+        working-directory: ./apps/microservices/${{ matrix.service }}
         run: mvn clean package -DskipTests=false
 
       - name: Run Unit Tests
-        working-directory: ./microservices/${{ matrix.service }}
+        working-directory: ./apps/microservices/${{ matrix.service }}
         run: mvn test
 
       - name: Upload Test Results
@@ -44,7 +44,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ matrix.service }}
-          path: microservices/${{ matrix.service }}/target/surefire-reports/
+          path: apps/microservices/${{ matrix.service }}/target/surefire-reports/
 
   security-scan:
     name: Security Scanning (DevSecOps)
@@ -132,7 +132,7 @@ jobs:
       - name: Build and Push User Service
         uses: docker/build-push-action@v5
         with:
-          context: ./microservices/user-service
+          context: ./apps/microservices/user-service
           push: ${{ github.event_name == 'push' && secrets.DOCKER_USERNAME != '' }}
           tags: ${{ steps.user_meta.outputs.tags }}
           labels: ${{ steps.user_meta.outputs.labels }}
@@ -142,7 +142,7 @@ jobs:
       - name: Build and Push Order Service
         uses: docker/build-push-action@v5
         with:
-          context: ./microservices/order-service
+          context: ./apps/microservices/order-service
           push: ${{ github.event_name == 'push' && secrets.DOCKER_USERNAME != '' }}
           tags: ${{ steps.order_meta.outputs.tags }}
           labels: ${{ steps.order_meta.outputs.labels }}
@@ -152,7 +152,7 @@ jobs:
       - name: Build and Push Inventory Service
         uses: docker/build-push-action@v5
         with:
-          context: ./microservices/inventory-service
+          context: ./apps/microservices/inventory-service
           push: ${{ github.event_name == 'push' && secrets.DOCKER_USERNAME != '' }}
           tags: ${{ steps.inventory_meta.outputs.tags }}
           labels: ${{ steps.inventory_meta.outputs.labels }}

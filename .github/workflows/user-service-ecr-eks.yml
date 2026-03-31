@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'microservices/user-service/**'
+      - 'apps/microservices/user-service/**'
       - '.github/workflows/user-service-ecr-eks.yml'
   workflow_dispatch:
     inputs:
@@ -65,7 +65,7 @@ jobs:
           aws ecr create-repository --repository-name "${{ env.ECR_REPOSITORY }}"
 
       - name: Build and push user-service image
-        working-directory: microservices/user-service
+        working-directory: apps/microservices/user-service
         env:
           IMAGE_URI: ${{ steps.vars.outputs.image_uri }}
         run: |

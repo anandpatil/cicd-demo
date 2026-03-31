@@ -131,33 +131,33 @@ demo_build_microservices() {
     print_section "Building Microservices Locally"
     
     print_step "Building User Service..."
-    if [ -d "microservices/user-service" ]; then
-        cd microservices/user-service
+    if [ -d "apps/microservices/user-service" ]; then
+        cd apps/microservices/user-service
         if [ -f "pom.xml" ]; then
             mvn clean package -DskipTests=false -q 2>/dev/null || print_warning "Build skipped"
             print_success "User Service built"
         fi
-        cd ../../
+        cd ../../../
     fi
     
     print_step "Building Order Service..."
-    if [ -d "microservices/order-service" ]; then
-        cd microservices/order-service
+    if [ -d "apps/microservices/order-service" ]; then
+        cd apps/microservices/order-service
         if [ -f "pom.xml" ]; then
             mvn clean package -DskipTests=false -q 2>/dev/null || print_warning "Build skipped"
             print_success "Order Service built"
         fi
-        cd ../../
+        cd ../../../
     fi
     
     print_step "Building Inventory Service..."
-    if [ -d "microservices/inventory-service" ]; then
-        cd microservices/inventory-service
+    if [ -d "apps/microservices/inventory-service" ]; then
+        cd apps/microservices/inventory-service
         if [ -f "pom.xml" ]; then
             mvn clean package -DskipTests=false -q 2>/dev/null || print_warning "Build skipped"
             print_success "Inventory Service built"
         fi
-        cd ../../
+        cd ../../../
     fi
 }
 
@@ -166,15 +166,15 @@ demo_docker_build() {
     print_section "Docker Image Building"
     
     print_step "Building User Service Docker image..."
-    docker build -t user-service:latest -q ./microservices/user-service 2>/dev/null && \
+    docker build -t user-service:latest -q ./apps/microservices/user-service 2>/dev/null && \
         print_success "user-service:latest built" || print_warning "Docker build skipped"
     
     print_step "Building Order Service Docker image..."
-    docker build -t order-service:latest -q ./microservices/order-service 2>/dev/null && \
+    docker build -t order-service:latest -q ./apps/microservices/order-service 2>/dev/null && \
         print_success "order-service:latest built" || print_warning "Docker build skipped"
     
     print_step "Building Inventory Service Docker image..."
-    docker build -t inventory-service:latest -q ./microservices/inventory-service 2>/dev/null && \
+    docker build -t inventory-service:latest -q ./apps/microservices/inventory-service 2>/dev/null && \
         print_success "inventory-service:latest built" || print_warning "Docker build skipped"
     
     echo ""

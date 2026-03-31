@@ -20,19 +20,19 @@ jobs:
       - name: Build User Service
         run: |
           echo "🏗️ Building User Service..."
-          docker build -t user-service:latest ./microservices/user-service
+          docker build -t user-service:latest ./apps/microservices/user-service
           echo "✅ User Service built successfully"
 
       - name: Build Order Service
         run: |
           echo "🏗️ Building Order Service..."
-          docker build -t order-service:latest ./microservices/order-service
+          docker build -t order-service:latest ./apps/microservices/order-service
           echo "✅ Order Service built successfully"
 
       - name: Build Inventory Service
         run: |
           echo "🏗️ Building Inventory Service..."
-          docker build -t inventory-service:latest ./microservices/inventory-service
+          docker build -t inventory-service:latest ./apps/microservices/inventory-service
           echo "✅ Inventory Service built successfully"
 
       - name: List Built Images
