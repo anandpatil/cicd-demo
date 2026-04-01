@@ -21,7 +21,7 @@ pipeline {
         CODEQL_EXE_WIN = 'D:/anand/work/swtools/codeql/dist/codeql/codeql.exe'
         CODEQL_DB_DIR = 'codeql-db-user-service'
         CODEQL_SARIF = 'codeql-user-service.sarif'
-        GIT_REPO_URL = 'git@github.com:anandpatil/cicd-demo.git'
+        GIT_REPO_URL = 'https://github.com/anandpatil/cicd-demo.git'
         GIT_BRANCH = 'feature/devopsChanges'
     }
 
@@ -59,7 +59,7 @@ where codeql >nul 2>nul || exit /b 1
                         extensions: [],
                         userRemoteConfigs: [[
                             url: env.GIT_REPO_URL,
-                            credentialsId: 'github-ssh-key'
+                            credentialsId: 'github-pat'
                         ]]
                     ])
                 }
