@@ -14,3 +14,6 @@ Suggested next phase:
 1. Update all CI/CD, Makefile, and docs references.
 2. Run full verification pipeline.
 3. Switch source-of-truth paths to `devops/*`.
+
+
+Test CI
