@@ -71,8 +71,29 @@ jobs:
       matrix:
         service: [user-service, order-service, inventory-service]
     steps:
-      - name: Checkout Code
+      - name: Checkout CICD Demo Repository
         uses: actions/checkout@v4
+        if: matrix.service != 'user-service'
+        with:
+          path: repo
+
+      - name: Checkout User Service Repository
+        uses: actions/checkout@v4
+        if: matrix.service == 'user-service'
+        with:
+          repository: anandpatil/user-service
+          path: user-service-repo
+
+      - name: Resolve Service Source
+        id: source
+        run: |
+          if [ "${{ matrix.service }}" = "user-service" ]; then
+            echo "service_dir=user-service-repo" >> "$GITHUB_OUTPUT"
+            echo "artifact_dir=user-service-repo/target" >> "$GITHUB_OUTPUT"
+          else
+            echo "service_dir=repo/apps/microservices/${{ matrix.service }}" >> "$GITHUB_OUTPUT"
+            echo "artifact_dir=repo/apps/microservices/${{ matrix.service }}/target" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up JDK ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
@@ -82,7 +103,7 @@ jobs:
           cache: maven
 
       - name: Build ${{ matrix.service }}
-        working-directory: ./apps/microservices/${{ matrix.service }}
+        working-directory: ${{ steps.source.outputs.service_dir }}
         run: mvn -B -ntp clean package
 
       - name: Upload JAR Artifact
@@ -90,8 +111,8 @@ jobs:
         with:
           name: jars-${{ matrix.service }}
           path: |
-            apps/microservices/${{ matrix.service }}/target/*.jar
-            !apps/microservices/${{ matrix.service }}/target/*.jar.original
+            ${{ steps.source.outputs.artifact_dir }}/*.jar
+            !${{ steps.source.outputs.artifact_dir }}/*.jar.original
 
   publish-jars:
     name: Publish JAR Release Assets
@@ -123,8 +144,27 @@ jobs:
       matrix:
         service: [user-service, order-service, inventory-service]
     steps:
-      - name: Checkout Code
+      - name: Checkout CICD Demo Repository
         uses: actions/checkout@v4
+        if: matrix.service != 'user-service'
+        with:
+          path: repo
+
+      - name: Checkout User Service Repository
+        uses: actions/checkout@v4
+        if: matrix.service == 'user-service'
+        with:
+          repository: anandpatil/user-service
+          path: user-service-repo
+
+      - name: Resolve Docker Context
+        id: docker-source
+        run: |
+          if [ "${{ matrix.service }}" = "user-service" ]; then
+            echo "context_dir=user-service-repo" >> "$GITHUB_OUTPUT"
+          else
+            echo "context_dir=repo/apps/microservices/${{ matrix.service }}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -148,7 +188,7 @@ jobs:
       - name: Build and Push ${{ matrix.service }}
         uses: docker/build-push-action@v5
         with:
-          context: ./apps/microservices/${{ matrix.service }}
+          context: ${{ steps.docker-source.outputs.context_dir }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
