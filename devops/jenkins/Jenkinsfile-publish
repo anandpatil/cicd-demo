@@ -1,0 +1,225 @@
+pipeline {
+    agent any
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        disableConcurrentBuilds()
+        skipDefaultCheckout(true)
+        timestamps()
+        timeout(time: 30, unit: 'MINUTES')
+    }
+
+    parameters {
+        string(
+            name: 'SOURCE_BRANCH',
+            defaultValue: 'main',
+            description: 'Git branch to dispatch the publish workflow from'
+        )
+        string(
+            name: 'RELEASE_TAG',
+            defaultValue: '',
+            description: 'Release tag to publish, for example v1.0.0'
+        )
+        booleanParam(
+            name: 'PUBLISH_JARS',
+            defaultValue: true,
+            description: 'Upload service JAR files to the GitHub release'
+        )
+        booleanParam(
+            name: 'PUBLISH_DOCKER_IMAGES',
+            defaultValue: true,
+            description: 'Build and publish Docker images to GitHub Container Registry'
+        )
+        booleanParam(
+            name: 'WAIT_FOR_COMPLETION',
+            defaultValue: true,
+            description: 'Wait for the GitHub Actions workflow run to finish'
+        )
+        string(
+            name: 'WORKFLOW_FILE',
+            defaultValue: 'publish-artifacts.yml',
+            description: 'Workflow file name to dispatch in GitHub Actions'
+        )
+        string(
+            name: 'GITHUB_REPO',
+            defaultValue: 'anandpatil/cicd-demo',
+            description: 'GitHub repository in owner/repo format'
+        )
+        string(
+            name: 'GITHUB_TOKEN_CREDENTIALS_ID',
+            defaultValue: 'github-credentials',
+            description: 'Jenkins username/password credential ID with the PAT in password'
+        )
+    }
+
+    stages {
+        stage('Validate Inputs') {
+            steps {
+                script {
+                    env.RELEASE_TAG_VALUE = params.RELEASE_TAG?.trim()
+                    if (!env.RELEASE_TAG_VALUE) {
+                        error('RELEASE_TAG is required')
+                    }
+
+                    currentBuild.displayName = "#${env.BUILD_NUMBER} ${env.RELEASE_TAG_VALUE}"
+                    echo "Dispatching ${params.WORKFLOW_FILE} for ${params.GITHUB_REPO}"
+                    echo "Branch: ${params.SOURCE_BRANCH}"
+                    echo "Publish JARs: ${params.PUBLISH_JARS}"
+                    echo "Publish Docker images: ${params.PUBLISH_DOCKER_IMAGES}"
+                }
+            }
+        }
+
+        stage('Verify GitHub API Access') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: params.GITHUB_TOKEN_CREDENTIALS_ID,
+                        usernameVariable: 'GITHUB_USERNAME',
+                        passwordVariable: 'GITHUB_TOKEN'
+                    )
+                ]) {
+                    script {
+                        if (isUnix()) {
+                            sh '''#!/bin/sh
+set -eu
+curl -fsS \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  "https://api.github.com/repos/${GITHUB_REPO}" >/dev/null
+'''
+                        } else {
+                            powershell '''
+$ErrorActionPreference = "Stop"
+$headers = @{
+    Accept = "application/vnd.github+json"
+    Authorization = "Bearer $env:GITHUB_TOKEN"
+}
+$repoUrl = "https://api.github.com/repos/$env:GITHUB_REPO"
+Invoke-RestMethod -Method Get -Headers $headers -Uri $repoUrl | Out-Null
+'''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Dispatch Publish Workflow') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: params.GITHUB_TOKEN_CREDENTIALS_ID,
+                        usernameVariable: 'GITHUB_USERNAME',
+                        passwordVariable: 'GITHUB_TOKEN'
+                    )
+                ]) {
+                    script {
+                        if (isUnix()) {
+                            sh '''#!/bin/sh
+set -eu
+payload=$(cat <<EOF
+{
+  "ref": "${SOURCE_BRANCH}",
+  "inputs": {
+    "release_tag": "${RELEASE_TAG_VALUE}",
+    "publish_jars": ${PUBLISH_JARS},
+    "publish_docker_images": ${PUBLISH_DOCKER_IMAGES}
+  }
+}
+EOF
+)
+
+curl -fsS -X POST \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  "https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${WORKFLOW_FILE}/dispatches" \
+  -d "$payload"
+'''
+                        } else {
+                            powershell '''
+$ErrorActionPreference = "Stop"
+$headers = @{
+    Accept = "application/vnd.github+json"
+    Authorization = "Bearer $env:GITHUB_TOKEN"
+    "X-GitHub-Api-Version" = "2022-11-28"
+}
+$body = @{
+    ref = $env:SOURCE_BRANCH
+    inputs = @{
+        release_tag = $env:RELEASE_TAG_VALUE
+        publish_jars = [System.Convert]::ToBoolean($env:PUBLISH_JARS)
+        publish_docker_images = [System.Convert]::ToBoolean($env:PUBLISH_DOCKER_IMAGES)
+    }
+} | ConvertTo-Json -Depth 5
+
+$dispatchUrl = "https://api.github.com/repos/$env:GITHUB_REPO/actions/workflows/$env:WORKFLOW_FILE/dispatches"
+Invoke-RestMethod -Method Post -Headers $headers -Uri $dispatchUrl -Body $body
+'''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Wait For Workflow Run') {
+            when {
+                expression { params.WAIT_FOR_COMPLETION }
+            }
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: params.GITHUB_TOKEN_CREDENTIALS_ID,
+                        usernameVariable: 'GITHUB_USERNAME',
+                        passwordVariable: 'GITHUB_TOKEN'
+                    )
+                ]) {
+                    script {
+                        if (isUnix()) {
+                            sh 'echo "Workflow dispatch submitted. Waiting for completion is only implemented for Windows agents in this job."'
+                        } else {
+                            powershell '''
+$ErrorActionPreference = "Stop"
+$headers = @{
+    Accept = "application/vnd.github+json"
+    Authorization = "Bearer $env:GITHUB_TOKEN"
+}
+
+Start-Sleep -Seconds 10
+$run = $null
+$runsBase = "https://api.github.com/repos/$env:GITHUB_REPO/actions/workflows/"
+$runsPath = "$env:WORKFLOW_FILE/runs?event=workflow_dispatch&branch=$env:SOURCE_BRANCH&per_page=5"
+$runsUrl = $runsBase + $runsPath
+for ($attempt = 0; $attempt -lt 20; $attempt++) {
+    $runs = Invoke-RestMethod -Method Get -Headers $headers -Uri $runsUrl
+    $run = $runs.workflow_runs | Select-Object -First 1
+    if ($run) {
+        break
+    }
+    Start-Sleep -Seconds 10
+}
+
+if (-not $run) {
+    throw "Workflow dispatch submitted, but no workflow run was discovered in time."
+}
+
+do {
+    $runUrl = "https://api.github.com/repos/$env:GITHUB_REPO/actions/runs/$($run.id)"
+    $run = Invoke-RestMethod -Method Get -Headers $headers -Uri $runUrl
+    Write-Output "GitHub Actions run: $($run.html_url)"
+    if ($run.status -ne 'completed') {
+        Start-Sleep -Seconds 15
+    }
+} while ($run.status -ne 'completed')
+
+if ($run.conclusion -ne 'success') {
+    throw "Publish workflow finished with conclusion: $($run.conclusion)"
+}
+'''
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

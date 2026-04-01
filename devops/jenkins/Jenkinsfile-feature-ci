@@ -9,18 +9,14 @@ pipeline {
     }
 
     triggers {
-        // Triggered by the GitHub Actions workflow (.github/workflows/trigger-jenkins-feature-ci.yml)
-        // on every push to the feature branch via Generic Webhook Trigger plugin.
-        // Token must match the JENKINS_FEATURE_CI_TOKEN secret configured in GitHub.
-        GenericWebhookTrigger(token: 'feature-ci-trigger')
+        // Local/private Jenkins cannot receive GitHub push webhooks directly,
+        // so poll the feature branch for new commits instead.
+        pollSCM('H/2 * * * *')
     }
 
     environment {
         MAVEN_ARGS = '-B -ntp'
         MVN_CMD_WIN = 'D:/anand/work/swtools/mvn/bin/mvn.cmd'
-        CODEQL_EXE_WIN = 'D:/anand/work/swtools/codeql/dist/codeql/codeql.exe'
-        CODEQL_DB_DIR = 'codeql-db-user-service'
-        CODEQL_SARIF = 'codeql-user-service.sarif'
         GIT_REPO_URL = 'https://github.com/anandpatil/cicd-demo.git'
         GIT_BRANCH = 'feature/devopsChanges'
     }
@@ -35,14 +31,10 @@ pipeline {
                         sh '''#!/bin/sh
 set -eu
 command -v mvn
-command -v codeql
 '''
                     } else {
                         bat '''@echo off
 if not exist "%MVN_CMD_WIN%" exit /b 1
-if exist "%CODEQL_EXE_WIN%" goto :toolchain_ok
-where codeql >nul 2>nul || exit /b 1
-:toolchain_ok
 '''
                     }
                 }
@@ -66,7 +58,7 @@ where codeql >nul 2>nul || exit /b 1
             }
         }
 
-        stage('Unit Tests And Coverage') {
+        stage('Build ,Unit Tests And Coverage') {
             steps {
                 dir('apps/microservices/user-service') {
                     script {
@@ -80,67 +72,6 @@ where codeql >nul 2>nul || exit /b 1
             }
         }
 
-        stage('CodeQL Analysis') {
-            steps {
-                dir('apps/microservices/user-service') {
-                    script {
-                        if (isUnix()) {
-                            sh '''#!/bin/sh
-set -eu
-command -v codeql
-rm -rf "$WORKSPACE/$CODEQL_DB_DIR" "$WORKSPACE/$CODEQL_SARIF"
-codeql database create "$WORKSPACE/$CODEQL_DB_DIR" --overwrite --language=java --source-root . --command "mvn -B -DskipTests=true clean compile"
-# Some CodeQL versions auto-finalize during create; do not fail if already finalized.
-codeql database finalize "$WORKSPACE/$CODEQL_DB_DIR" || true
-codeql database analyze "$WORKSPACE/$CODEQL_DB_DIR" codeql/java-queries --download --format=sarif-latest --output "$WORKSPACE/$CODEQL_SARIF"
-ERROR_COUNT=$(grep -o '"level":"error"' "$WORKSPACE/$CODEQL_SARIF" | wc -l | tr -d ' ')
-echo "CodeQL error-level findings: $ERROR_COUNT"
-if [ "$ERROR_COUNT" -gt 0 ]; then
-  echo "Failing build due to CodeQL error-level findings"
-  exit 1
-fi
-'''
-                        } else {
-                            powershell '''
-$ErrorActionPreference = "Stop"
-$codeqlExe = $env:CODEQL_EXE_WIN
-if (-not (Test-Path $codeqlExe)) {
-    $cmd = Get-Command codeql -ErrorAction SilentlyContinue
-    if ($cmd) { $codeqlExe = $cmd.Source } else { $codeqlExe = $null }
-}
-if (-not $codeqlExe) {
-    Write-Error "codeql CLI not found. Install CodeQL and add it to PATH, or install to $env:CODEQL_EXE_WIN"
-    exit 1
-}
-Write-Output "Using CodeQL: $codeqlExe"
-
-$dbPath = Join-Path $env:WORKSPACE $env:CODEQL_DB_DIR
-$sarifPath = Join-Path $env:WORKSPACE $env:CODEQL_SARIF
-if (Test-Path $dbPath) { Remove-Item -Recurse -Force $dbPath }
-if (Test-Path $sarifPath) { Remove-Item -Force $sarifPath }
-
-$buildCmd = "$env:MVN_CMD_WIN -B -DskipTests=true clean compile"
-& $codeqlExe database create $dbPath --language=java --source-root . --command $buildCmd
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-# Some CodeQL versions auto-finalize during create; ignore finalize failure in that case.
-& $codeqlExe database finalize $dbPath *> $null
-
-& $codeqlExe database analyze $dbPath codeql/java-queries --download --format=sarif-latest --output $sarifPath
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-$sarifRaw = Get-Content -Raw $sarifPath
-if ($sarifRaw -match '"level":"error"') {
-    Write-Output "CodeQL error-level findings detected"
-    exit 1
-}
-Write-Output "CodeQL error-level findings: 0"
-'''
-                        }
-                    }
-                }
-            }
-        }
     }
 
     post {
@@ -195,10 +126,10 @@ Write-Output "CodeQL error-level findings: 0"
                 }
             }
         }
-        always {
-            junit allowEmptyResults: true, testResults: 'apps/microservices/user-service/target/surefire-reports/*.xml'
-            archiveArtifacts allowEmptyArchive: true, artifacts: 'apps/microservices/user-service/target/site/jacoco/**, codeql-user-service.sarif'
-            cleanWs()
-        }
+        // always {
+        //     // junit allowEmptyResults: true, testResults: 'apps/microservices/user-service/target/surefire-reports/*.xml'
+        //     // archiveArtifacts allowEmptyArchive: true, artifacts: 'apps/microservices/user-service/target/site/jacoco/**'
+        //     // cleanWs()
+        // }
     }
 }

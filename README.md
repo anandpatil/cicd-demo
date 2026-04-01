@@ -279,6 +279,6 @@ MIT License - Educational use encouraged!
 
 <div align="center">
 
-**Built for CDAC DevSecOps Demo | 2024**
+**Built for DevSecOps Demo **
 
 </div>

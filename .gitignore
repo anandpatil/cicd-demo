@@ -53,4 +53,8 @@ test-output/
 surefire-reports/
 .secrets.env
 *secrets*.env
-.jenkins-home/config.xml
+
+*.zip
+*.tar.gz
+*.7z    
+
