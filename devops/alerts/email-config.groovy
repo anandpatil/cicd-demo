@@ -7,7 +7,7 @@ JENKINS_SMTP_PORT=587
 JENKINS_SMTP_USE_TLS=true
 
 # Email Recipients
-EMAIL_TO=devops-team@cdac.com,developers@cdac.com
+EMAIL_TO=anand.dpatil@gmail.com
 EMAIL_FROM=jenkins@cdac-demo.com
 
 # Email Templates
@@ -82,8 +82,8 @@ SUCCESS_EMAIL_TEMPLATE = '''
 
 # Configuration for Jenkins Email Extension Plugin
 emailExt {
-    recipients 'devops-team@cdac.com developers@cdac.com'
-    replyTo 'jenkins@cdac-demo.com'
+    recipients '${EMAIL_TO}'
+    replyTo '${EMAIL_FROM}'
     subject '$DEFAULT_SUBJECT'
     body '${DEFAULT_CONTENT}'
     attachLog true

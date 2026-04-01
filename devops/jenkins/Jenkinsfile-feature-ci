@@ -21,7 +21,7 @@ pipeline {
         CODEQL_EXE_WIN = 'D:/anand/work/swtools/codeql/dist/codeql/codeql.exe'
         CODEQL_DB_DIR = 'codeql-db-user-service'
         CODEQL_SARIF = 'codeql-user-service.sarif'
-        GIT_REPO_URL = 'D:/anand/work/projects/cicd-demo'
+        GIT_REPO_URL = 'git@github.com:anandpatil/cicd-demo.git'
         GIT_BRANCH = 'feature/devopsChanges'
     }
 
@@ -57,7 +57,10 @@ where codeql >nul 2>nul || exit /b 1
                         branches: [[name: "*/${env.GIT_BRANCH}"]],
                         doGenerateSubmoduleConfigurations: false,
                         extensions: [],
-                        userRemoteConfigs: [[url: env.GIT_REPO_URL]]
+                        userRemoteConfigs: [[
+                            url: env.GIT_REPO_URL,
+                            credentialsId: 'github-ssh-key'
+                        ]]
                     ])
                 }
             }
@@ -141,6 +144,57 @@ Write-Output "CodeQL error-level findings: 0"
     }
 
     post {
+        failure {
+            script {
+                try {
+                    emailext(
+                        recipientProviders: [developers(), requestor()],
+                        to: 'anand.dpatil@gmail.com',
+                        subject: 'Build Failure: ${JOB_NAME} - #${BUILD_NUMBER}',
+                        body: '''
+                            <html>
+                            <head>
+                                <style>
+                                    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+                                    .header { background-color: #dc3545; color: white; padding: 15px; border-radius: 5px 5px 0 0; }
+                                    .content { background-color: #f8f9fa; padding: 20px; border: 1px solid #dee2e6; margin-bottom: 10px; }
+                                    .footer { margin-top: 20px; font-size: 12px; color: #6c757d; }
+                                    .build-info { margin: 10px 0; }
+                                    .btn { display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; }
+                                </style>
+                            </head>
+                            <body>
+                                <div class="header">
+                                    <h2>🚨 BUILD FAILURE ALERT</h2>
+                                </div>
+                                <div class="content">
+                                    <h3>${env.JOB_NAME} - Build #${env.BUILD_NUMBER}</h3>
+                                    <div class="build-info">
+                                        <p><strong>Status:</strong> FAILED</p>
+                                        <p><strong>Branch:</strong> ${env.GIT_BRANCH ?: 'N/A'}</p>
+                                        <p><strong>Repository:</strong> ${env.GIT_URL ?: 'N/A'}</p>
+                                        <p><strong>Duration:</strong> ${currentBuild.durationString}</p>
+                                        <p><strong>Build Log:</strong></p>
+                                        <pre>${BUILD_LOG, maxLines=50}</pre>
+                                    </div>
+                                    <p><a href="${env.BUILD_URL}" class="btn">View Full Build Details</a></p>
+                                </div>
+                                <div class="footer">
+                                    <p>This is an automated alert. Please check the build logs and fix the issue.</p>
+                                </div>
+                            </body>
+                            </html>
+                        ''',
+                        mimeType: 'text/html',
+                        attachLog: true
+                    )
+                    echo "Failure notification email sent successfully to anand.dpatil@gmail.com"
+                } catch (Exception e) {
+                    echo "WARNING: Failed to send failure notification email: ${e.message}"
+                    echo "Build failure will not be blocked due to email notification failure"
+                }
+            }
+        }
         always {
             junit allowEmptyResults: true, testResults: 'apps/microservices/user-service/target/surefire-reports/*.xml'
             archiveArtifacts allowEmptyArchive: true, artifacts: 'apps/microservices/user-service/target/site/jacoco/**, codeql-user-service.sarif'

@@ -46,7 +46,6 @@ jobs:
     name: Sonar Quality Gate
     runs-on: ubuntu-latest
     needs: test-and-coverage
-    if: ${{ secrets.SONAR_TOKEN != '' && secrets.SONAR_PROJECT_KEY != '' && secrets.SONAR_HOST_URL != '' }}
 
     steps:
       - name: Checkout
