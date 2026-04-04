@@ -1,0 +1,8 @@
+{
+  "name": "cicd-demo",
+  "version": "1.0.0",
+  "description": "CI/CD Demo Project",
+  "scripts": {
+    "build": "echo 'Build complete'"
+  }
+}
