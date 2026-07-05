@@ -4,7 +4,7 @@ services:
   # User Service
   user-service:
     build:
-      context: ./microservices/user-service
+      context: ./apps/microservices/user-service
       dockerfile: Dockerfile
     container_name: user-service
     ports:
@@ -12,7 +12,10 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SERVER_PORT=8081
-      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics
+      - MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tempo:9411/api/v2/spans
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+      - MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED=true
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
       interval: 30s
@@ -21,12 +24,15 @@ services:
       start_period: 60s
     networks:
       - microservices-network
+    depends_on:
+      tempo:
+        condition: service_healthy
     restart: unless-stopped
 
   # Order Service
   order-service:
     build:
-      context: ./microservices/order-service
+      context: ./apps/microservices/order-service
       dockerfile: Dockerfile
     container_name: order-service
     ports:
@@ -35,7 +41,10 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
       - SERVER_PORT=8082
       - USER_SERVICE_URL=http://user-service:8081
-      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics
+      - MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tempo:9411/api/v2/spans
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+      - MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED=true
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/actuator/health"]
       interval: 30s
@@ -48,11 +57,13 @@ services:
     depends_on:
       user-service:
         condition: service_healthy
+      tempo:
+        condition: service_healthy
 
   # Inventory Service
   inventory-service:
     build:
-      context: ./microservices/inventory-service
+      context: ./apps/microservices/inventory-service
       dockerfile: Dockerfile
     container_name: inventory-service
     ports:
@@ -60,7 +71,10 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SERVER_PORT=8083
-      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics
+      - MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://tempo:9411/api/v2/spans
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+      - MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED=true
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8083/actuator/health"]
       interval: 30s
@@ -69,6 +83,9 @@ services:
       start_period: 60s
     networks:
       - microservices-network
+    depends_on:
+      tempo:
+        condition: service_healthy
     restart: unless-stopped
 
   # Nginx Reverse Proxy / Load Balancer
@@ -79,7 +96,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./devops/docker/nginx.conf:/etc/nginx/nginx.conf:ro
     networks:
       - microservices-network
     depends_on:
@@ -100,7 +117,59 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./devops/docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+  # Loki for Log Aggregation
+  loki:
+    image: grafana/loki:2.9.10
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./devops/docker/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+  # Promtail for Log Shipping (collects Docker container logs)
+  promtail:
+    image: grafana/promtail:2.9.10
+    container_name: promtail
+    volumes:
+      - ./devops/docker/promtail-config.yaml:/etc/promtail/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/config.yaml
+    networks:
+      - microservices-network
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  # Tempo for Distributed Tracing
+  tempo:
+    image: grafana/tempo:2.4.2
+    container_name: tempo
+    ports:
+      - "3200:3200"   # HTTP REST
+      - "3201:3201"   # gRPC (for Grafana)
+      - "9411:9411"   # Zipkin receiver
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    volumes:
+      - ./devops/docker/tempo-config.yaml:/etc/tempo/config.yaml:ro
+      - tempo-data:/var/tempo
+    command: -config.file=/etc/tempo/config.yaml
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3200/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     networks:
       - microservices-network
     restart: unless-stopped
@@ -113,12 +182,17 @@ services:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_APISERVER_ENABLED=false
+      - GF_LOG_LEVEL=warn
     volumes:
       - grafana-data:/var/lib/grafana
+      - ./devops/docker/grafana/provisioning:/etc/grafana/provisioning:ro
     networks:
       - microservices-network
     depends_on:
       - prometheus
+      - loki
+      - tempo
     restart: unless-stopped
 
 networks:
@@ -129,3 +203,7 @@ networks:
 volumes:
   grafana-data:
     name: grafana-data
+  loki-data:
+    name: loki-data
+  tempo-data:
+    name: tempo-data

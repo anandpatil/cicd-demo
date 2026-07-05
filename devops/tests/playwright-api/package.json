@@ -1,0 +1,16 @@
+{
+  "name": "cicd-demo-playwright-api-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright API E2E tests for cicd-demo microservices",
+  "scripts": {
+    "test": "playwright test",
+    "test:api": "playwright test tests/api-e2e.spec.ts",
+    "test:list": "playwright test --list",
+    "test:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.2",
+    "dotenv": "^16.4.5"
+  }
+}

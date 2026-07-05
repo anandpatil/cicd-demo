@@ -99,9 +99,9 @@ jobs:
         run: |
           for service in user-service order-service inventory-service; do
             echo "Building $service for analysis..."
-            cd microservices/$service
+            cd apps/microservices/$service
             mvn clean package -DskipTests=true -q
-            cd ../../
+            cd ../../../../
           done
 
       - name: Perform CodeQL Analysis
@@ -127,11 +127,7 @@ jobs:
           format: 'SARIF'
           args: >
             --enableExperimental
-            --scan ./microservices
-            
-      - name: List Generated Reports
-        if: always()
-        run: find . -name "*sarif" -o -name "*report*"
+            --scan ./apps/microservices
 
       - name: Upload Dependency Check Results
         uses: github/codeql-action/upload-sarif@v3

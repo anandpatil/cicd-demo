@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevSecOps CI/CD Demo Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 12px rgba(0,0,0,0.15);
+        }
+
+        .card h2 {
+            color: #1e3c72;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            border-bottom: 2px solid #2a5298;
+            padding-bottom: 10px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+
+        .status-healthy {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-degraded {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .status-offline {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-unknown {
+            background-color: #e2e3e5;
+            color: #383d41;
+        }
+
+        .status-available {
+            background-color: #cfe2ff;
+            color: #084298;
+        }
+
+        .status-unavailable {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 100px;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+
+        .btn-primary {
+            background-color: #2a5298;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #1e3c72;
+        }
+
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #218838;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+
+        .logs-panel {
+            background: #f8f9fa;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8em;
+            line-height: 1.4;
+        }
+
+        .log-line {
+            padding: 2px 0;
+            color: #555;
+        }
+
+        .workflow-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 0.9em;
+        }
+
+        .workflow-item:last-child {
+            border-bottom: none;
+        }
+
+        .workflow-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .workflow-status.success {
+            background-color: #28a745;
+        }
+
+        .workflow-status.failure {
+            background-color: #dc3545;
+        }
+
+        .workflow-status.pending {
+            background-color: #ffc107;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #2a5298;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .timestamp {
+            font-size: 0.8em;
+            color: #999;
+            margin-top: 10px;
+        }
+
+        .pipeline-flow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .pipeline-stage {
+            flex: 1;
+            text-align: center;
+            padding: 8px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            margin: 0 5px;
+        }
+
+        .pipeline-stage.active {
+            background: #2a5298;
+            color: white;
+        }
+
+        .demo-banner {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            color: #856404;
+        }
+
+        .loader {
+            text-align: center;
+            padding: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 DevSecOps CI/CD Demo Dashboard</h1>
+            <p>Real-time Pipeline & Microservices Monitoring</p>
+        </header>
+
+        {% if demo_mode %}
+        <div class="demo-banner">
+            <strong>✨ Demo Mode Enabled:</strong> Running in demonstration mode with simulated services. 
+            Configure real services and disable demo mode for production use.
+        </div>
+        {% endif %}
+
+        <div class="dashboard">
+            <!-- Services Health -->
+            <div class="card">
+                <h2>🌐 Microservices</h2>
+                <div id="services-status">
+                    <div class="loader">
+                        <div class="spinner"></div>
+                        Loading services...
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn-success" onclick="deployServices()">Start</button>
+                    <button class="btn-danger" onclick="stopServices()">Stop</button>
+                </div>
+            </div>
+
+            <!-- System Tools -->
+            <div class="card">
+                <h2>🔧 System Tools</h2>
+                <div id="system-status">
+                    <div class="loader">
+                        <div class="spinner"></div>
+                        Loading tools...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card">
+                <h2>⚡ Quick Actions</h2>
+                <div class="action-buttons" style="flex-direction: column;">
+                    <button class="btn-primary" onclick="triggerDemo('demo-build.yml')">
+                        🏗️ Demo Build
+                    </button>
+                    <button class="btn-primary" onclick="triggerDemo('ci-cd-pipeline.yml')">
+                        📦 Full Pipeline
+                    </button>
+                    <button class="btn-primary" onclick="triggerDemo('security-scan.yml')">
+                        🔒 Security Scan
+                    </button>
+                </div>
+            </div>
+
+            <!-- Recent Workflows -->
+            <div class="card full-width">
+                <h2>📊 Recent Workflows</h2>
+                <div id="workflows-status">
+                    <div class="loader">
+                        <div class="spinner"></div>
+                        Loading workflows...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pipeline Visualization -->
+            <div class="card full-width">
+                <h2>🔄 Pipeline Flow</h2>
+                <div class="pipeline-flow">
+                    <div class="pipeline-stage">📝 Checkout</div>
+                    <div style="flex-grow: 0; margin: 0 5px;">→</div>
+                    <div class="pipeline-stage">🔨 Build</div>
+                    <div style="flex-grow: 0; margin: 0 5px;">→</div>
+                    <div class="pipeline-stage">🧪 Test</div>
+                    <div style="flex-grow: 0; margin: 0 5px;">→</div>
+                    <div class="pipeline-stage">🔒 Security</div>
+                    <div style="flex-grow: 0; margin: 0 5px;">→</div>
+                    <div class="pipeline-stage">🐳 Docker</div>
+                    <div style="flex-grow: 0; margin: 0 5px;">→</div>
+                    <div class="pipeline-stage">🚀 Deploy</div>
+                </div>
+                <p style="text-align: center; margin-top: 15px; color: #666; font-size: 0.9em;">
+                    Click "Demo Build" or "Full Pipeline" to see the pipeline in action!
+                </p>
+            </div>
+        </div>
+
+        <div class="timestamp" style="text-align: center;">
+            Last updated: <span id="last-update">-</span>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        const UPDATE_INTERVAL = 5000; // 5 seconds
+
+        // Update dashboard status
+        function updateStatus() {
+            updateServices();
+            updateSystem();
+            updateWorkflows();
+            updateTimestamp();
+        }
+
+        function updateServices() {
+            fetch(`${API_BASE}/services`)
+                .then(r => r.json())
+                .then(data => {
+                    let html = '';
+                    for (let [name, info] of Object.entries(data)) {
+                        const statusClass = `status-${info.status}`;
+                        html += `
+                            <div class="status-item">
+                                <span>${name.replace('-', ' ')}</span>
+                                <span class="status-badge ${statusClass}">${info.status}</span>
+                            </div>
+                        `;
+                    }
+                    document.getElementById('services-status').innerHTML = html;
+                })
+                .catch(e => console.error('Error fetching services:', e));
+        }
+
+        function updateSystem() {
+            fetch(`${API_BASE}/system`)
+                .then(r => r.json())
+                .then(data => {
+                    let html = '';
+                    for (let [tool, status] of Object.entries(data)) {
+                        const statusClass = `status-${status}`;
+                        html += `
+                            <div class="status-item">
+                                <span>${tool}</span>
+                                <span class="status-badge ${statusClass}">${status}</span>
+                            </div>
+                        `;
+                    }
+                    document.getElementById('system-status').innerHTML = html;
+                })
+                .catch(e => console.error('Error fetching system:', e));
+        }
+
+        function updateWorkflows() {
+            fetch(`${API_BASE}/workflows`)
+                .then(r => r.json())
+                .then(data => {
+                    let html = '';
+                    if (data.workflows && data.workflows.length > 0) {
+                        data.workflows.forEach(w => {
+                            const statusClass = w.conclusion === 'success' ? 'success' : 
+                                              w.conclusion === 'failure' ? 'failure' : 'pending';
+                            html += `
+                                <div class="workflow-item">
+                                    <span class="workflow-status ${statusClass}"></span>
+                                    <strong>${w.name}</strong> - ${w.status}
+                                    <div style="font-size: 0.8em; color: #999; margin-top: 3px;">
+                                        Started: ${new Date(w.startedAt).toLocaleString()}
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    } else {
+                        html = '<p style="color: #999;">No workflows found</p>';
+                    }
+                    document.getElementById('workflows-status').innerHTML = html;
+                })
+                .catch(e => console.error('Error fetching workflows:', e));
+        }
+
+        function updateTimestamp() {
+            const now = new Date().toLocaleTimeString();
+            document.getElementById('last-update').textContent = now;
+        }
+
+        function triggerDemo(workflow) {
+            if (confirm(`Trigger ${workflow}?`)) {
+                fetch(`${API_BASE}/trigger-demo`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ workflow })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    alert(data.message || data.status);
+                    setTimeout(updateWorkflows, 2000);
+                })
+                .catch(e => alert('Error: ' + e.message));
+            }
+        }
+
+        function deployServices() {
+            fetch(`${API_BASE}/deploy`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'up' })
+            })
+            .then(r => r.json())
+            .then(data => {
+                alert(data.message);
+                setTimeout(updateServices, 2000);
+            })
+            .catch(e => alert('Error: ' + e.message));
+        }
+
+        function stopServices() {
+            if (confirm('Stop all services?')) {
+                fetch(`${API_BASE}/deploy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'down' })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    alert(data.message);
+                    setTimeout(updateServices, 2000);
+                })
+                .catch(e => alert('Error: ' + e.message));
+            }
+        }
+
+        // Initial load and periodic updates
+        updateStatus();
+        setInterval(updateStatus, UPDATE_INTERVAL);
+    </script>
+</body>
+</html>

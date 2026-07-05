@@ -1,0 +1,391 @@
+pipeline {
+    agent any
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        disableConcurrentBuilds()
+        skipDefaultCheckout(true)
+        timestamps()
+        timeout(time: 45, unit: 'MINUTES')
+    }
+
+    parameters {
+        choice(name: 'SERVICE', choices: ['all', 'user-service', 'order-service', 'inventory-service'], description: 'Service to build and deploy locally')
+        choice(name: 'K8S_NAMESPACE', choices: ['default', 'staging', 'production'], description: 'Local Kubernetes namespace to deploy into')
+        string(name: 'LOCAL_REPO_PATH', defaultValue: 'D:/anand/work/projects/cicd-demo', description: 'Absolute path to the local repository used by Jenkins')
+        booleanParam(name: 'DEPLOY_TO_K8S', defaultValue: false, description: 'Deploy built images to the local Kubernetes cluster')
+        booleanParam(name: 'ENABLE_SONAR_GATE', defaultValue: true, description: 'Run Sonar analysis for user-service and fail build when quality gate fails')
+        string(name: 'SONAR_HOST_URL', defaultValue: 'https://sonarcloud.io/', description: 'SonarQube/SonarCloud URL (required when ENABLE_SONAR_GATE=true)')
+        string(name: 'SONAR_PROJECT_KEY', defaultValue: 'anandpatil_cicd-demo', description: 'Sonar project key for user-service')
+        string(name: 'SONAR_ORGANIZATION_KEY', defaultValue: 'college-demo', description: 'Sonar organization key for user-service')
+        password(name: 'SONAR_TOKEN', defaultValue: '5f6e4b2dc2c7a4774431bcb1cca4893cbd1cd516', description: 'Sonar token (required when ENABLE_SONAR_GATE=true)')
+        booleanParam(name: 'ENABLE_CODEQL_GATE', defaultValue: false, description: 'Run CodeQL analysis for user-service and fail build if error-level issues are found')
+    }
+
+    environment {
+        MAVEN_ARGS = '-B -ntp'
+        MVN_CMD_WIN = 'D:/anand/work/swtools/mvn/bin/mvn.cmd'
+        ALL_SERVICES = 'user-service,order-service,inventory-service'
+        LOCAL_IMAGE_PREFIX = 'cicd-demo'
+        K8S_MANIFEST_DIR = 'devops/k8s'
+    }
+
+    stages {
+        stage('Prepare Local Environment') {
+            steps {
+                script {
+                    env.REPO_PATH = params.LOCAL_REPO_PATH.replace('\\', '/')
+                    env.REPO_PATH_WIN = params.LOCAL_REPO_PATH.replace('/', '\\')
+                    env.SELECTED_SERVICES = params.SERVICE == 'all' ? env.ALL_SERVICES : params.SERVICE
+                    env.IMAGE_TAG = "${env.BUILD_NUMBER}-local"
+                    env.CAN_DEPLOY_TO_K8S = params.DEPLOY_TO_K8S ? 'true' : 'false'
+                    currentBuild.displayName = "#${env.BUILD_NUMBER} ${params.SERVICE} local"
+
+                    if (isUnix()) {
+                        sh "test -f '${env.REPO_PATH}/devops/jenkins/Jenkinsfile'"
+                    } else {
+                        bat """@echo off
+if not exist "${env.REPO_PATH_WIN}\\devops\\jenkins\\Jenkinsfile" exit /b 1
+"""
+                    }
+
+                    echo "Local repo path: ${env.REPO_PATH}"
+                    echo "Selected services: ${env.SELECTED_SERVICES}"
+                    echo "Image tag: ${env.IMAGE_TAG}"
+                }
+            }
+        }
+
+        stage('Verify Local Toolchain') {
+            steps {
+                script {
+                    if (isUnix()) {
+                        sh '''#!/bin/sh
+set -eu
+command -v mvn
+command -v docker
+'''
+                        if (params.DEPLOY_TO_K8S) {
+                            def linuxCtxStatus = sh(returnStatus: true, script: '''#!/bin/sh
+set -eu
+command -v kubectl
+CTX="$(kubectl config current-context 2>/dev/null || true)"
+if [ -z "$CTX" ]; then
+  if kubectl config get-contexts -o name | grep -qx docker-desktop; then
+    kubectl config use-context docker-desktop >/dev/null
+  else
+    FIRST_CTX="$(kubectl config get-contexts -o name | head -n 1 || true)"
+    if [ -z "$FIRST_CTX" ]; then
+      exit 42
+    fi
+    kubectl config use-context "$FIRST_CTX" >/dev/null
+  fi
+fi
+kubectl config current-context >/dev/null
+''')
+
+                            if (linuxCtxStatus == 42) {
+                                env.CAN_DEPLOY_TO_K8S = 'false'
+                                echo "No Kubernetes context configured on Jenkins node; Build/Test will continue and Kubernetes deploy stages will be skipped."
+                            } else if (linuxCtxStatus != 0) {
+                                error("Kubernetes toolchain verification failed with exit code ${linuxCtxStatus}")
+                            } else {
+                                sh 'echo ACTIVE_CONTEXT=$(kubectl config current-context)'
+                            }
+                        } else {
+                            echo "DEPLOY_TO_K8S=false, skipping Kubernetes context checks."
+                        }
+                    } else {
+                        bat """@echo off
+if not exist "${env.MVN_CMD_WIN}" exit /b 1
+where docker
+"""
+
+                        if (params.DEPLOY_TO_K8S) {
+                            def winCtxStatus = bat(returnStatus: true, script: '''@echo off
+where kubectl >nul 2>nul || exit /b 3
+powershell -NoProfile -Command "$ctx = kubectl config current-context 2>$null; if (-not $ctx) { $contexts = @(kubectl config get-contexts -o name 2>$null); if (-not $contexts -or $contexts.Count -eq 0) { exit 42 }; if ($contexts -contains 'docker-desktop') { kubectl config use-context docker-desktop | Out-Null } else { kubectl config use-context $contexts[0] | Out-Null } }; $ctx = kubectl config current-context 2>$null; if (-not $ctx) { exit 42 }"
+''')
+
+                            if (winCtxStatus == 42) {
+                                env.CAN_DEPLOY_TO_K8S = 'false'
+                                echo "No Kubernetes context configured on Jenkins node; Build/Test will continue and Kubernetes deploy stages will be skipped."
+                            } else if (winCtxStatus != 0) {
+                                error("Kubernetes toolchain verification failed with exit code ${winCtxStatus}")
+                            } else {
+                                bat """@echo off
+for /f %%I in ('kubectl config current-context') do @echo ACTIVE_CONTEXT=%%I
+"""
+                            }
+                        } else {
+                            echo "DEPLOY_TO_K8S=false, skipping Kubernetes context checks."
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build And Test') {
+            steps {
+                script {
+                    def services = env.SELECTED_SERVICES.tokenize(',')
+                    def branches = services.collectEntries { service ->
+                        [(service): {
+                            dir("${env.REPO_PATH_WIN}\\apps\\microservices\\${service}") {
+                                if (isUnix()) {
+                                    sh "mvn ${env.MAVEN_ARGS} clean verify"
+                                } else {
+                                    bat "\"${env.MVN_CMD_WIN}\" ${env.MAVEN_ARGS} clean verify"
+                                }
+                            }
+                        }]
+                    }
+                    parallel branches
+                }
+            }
+        }
+
+        stage('Sonar Quality Gate (User Service)') {
+            when {
+                expression { params.ENABLE_SONAR_GATE && env.SELECTED_SERVICES.contains('user-service') }
+            }
+            steps {
+                script {
+                    if (!params.SONAR_HOST_URL?.toString().trim()) {
+                        error('SONAR_HOST_URL is required when ENABLE_SONAR_GATE=true')
+                    }
+                    if (!params.SONAR_PROJECT_KEY?.toString().trim()) {
+                        error('SONAR_PROJECT_KEY is required when ENABLE_SONAR_GATE=true')
+                    }
+                    if (!params.SONAR_TOKEN?.toString().trim()) {
+                        error('SONAR_TOKEN is required when ENABLE_SONAR_GATE=true')
+                    }
+
+                    dir("${env.REPO_PATH_WIN}\\apps\\microservices\\user-service") {
+                        if (isUnix()) {
+                            sh """mvn ${env.MAVEN_ARGS} verify sonar:sonar \
+  -Dsonar.projectKey=${params.SONAR_PROJECT_KEY} \
+  -Dsonar.host.url=${params.SONAR_HOST_URL} \
+  -Dsonar.organization=${params.SONAR_ORGANIZATION_KEY} \
+  -Dsonar.token=${params.SONAR_TOKEN} \
+  -Dsonar.qualitygate.wait=true"""
+                        } else {
+                            bat "\"${env.MVN_CMD_WIN}\" ${env.MAVEN_ARGS} verify sonar:sonar -Dsonar.organization=${params.SONAR_ORGANIZATION_KEY} -Dsonar.projectKey=${params.SONAR_PROJECT_KEY} -Dsonar.host.url=${params.SONAR_HOST_URL} -Dsonar.token=${params.SONAR_TOKEN} -Dsonar.qualitygate.wait=true"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('CodeQL Gate (User Service)') {
+            when {
+                expression { params.ENABLE_CODEQL_GATE && env.SELECTED_SERVICES.contains('user-service') }
+            }
+            steps {
+                script {
+                    dir("${env.REPO_PATH_WIN}\\apps\\microservices\\user-service") {
+                        if (isUnix()) {
+                            sh '''#!/bin/sh
+set -eu
+command -v codeql
+rm -rf "$WORKSPACE/codeql-db-user-service" "$WORKSPACE/codeql-user-service.sarif"
+codeql database create "$WORKSPACE/codeql-db-user-service" --language=java --source-root . --command "mvn -B -DskipTests=true clean compile"
+codeql database finalize "$WORKSPACE/codeql-db-user-service"
+codeql database analyze "$WORKSPACE/codeql-db-user-service" codeql/java-queries --download --format=sarif-latest --output "$WORKSPACE/codeql-user-service.sarif"
+ERROR_COUNT=$(grep -o '"level":"error"' "$WORKSPACE/codeql-user-service.sarif" | wc -l | tr -d ' ')
+echo "CodeQL error-level findings: $ERROR_COUNT"
+if [ "$ERROR_COUNT" -gt 0 ]; then
+  echo "Failing build due to CodeQL error-level findings"
+  exit 1
+fi
+'''
+                        } else {
+                            bat '''@echo off
+set "CODEQL_EXE=D:\\anand\\work\\swtools\\codeql\\dist\\codeql\\codeql.exe"
+if not exist "%CODEQL_EXE%" set "CODEQL_EXE="
+if not defined CODEQL_EXE for /f "delims=" %%I in ('where codeql 2^>nul') do if not defined CODEQL_EXE set "CODEQL_EXE=%%I"
+if not defined CODEQL_EXE (
+    echo ERROR: codeql CLI not found. Install CodeQL and add it to PATH, or install to D:\\anand\\work\\swtools\\codeql\\dist\\codeql\\codeql.exe
+    exit /b 1
+)
+echo Using CodeQL: %CODEQL_EXE%
+if exist "%WORKSPACE%\\codeql-db-user-service" rmdir /s /q "%WORKSPACE%\\codeql-db-user-service"
+if exist "%WORKSPACE%\\codeql-user-service.sarif" del /f /q "%WORKSPACE%\\codeql-user-service.sarif"
+set "CODEQL_BUILD_CMD=%MVN_CMD_WIN% -B -DskipTests=true clean compile"
+"%CODEQL_EXE%" database create "%WORKSPACE%\\codeql-db-user-service" --language=java --source-root . --command "%CODEQL_BUILD_CMD%"
+if errorlevel 1 exit /b 1
+"%CODEQL_EXE%" database finalize "%WORKSPACE%\\codeql-db-user-service"
+if errorlevel 1 exit /b 1
+"%CODEQL_EXE%" database analyze "%WORKSPACE%\\codeql-db-user-service" codeql/java-queries --download --format=sarif-latest --output "%WORKSPACE%\\codeql-user-service.sarif"
+if errorlevel 1 exit /b 1
+powershell -NoProfile -Command "$sarif = Get-Content -Raw \"$env:WORKSPACE\\codeql-user-service.sarif\" | ConvertFrom-Json; $errors = @(); foreach ($run in $sarif.runs) { if ($run.results) { $errors += @($run.results | Where-Object { $_.level -eq 'error' }) } }; Write-Output ('CodeQL error-level findings: ' + $errors.Count); if ($errors.Count -gt 0) { exit 1 }"
+if errorlevel 1 exit /b 1
+'''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build Local Docker Images') {
+            steps {
+                script {
+                    def services = env.SELECTED_SERVICES.tokenize(',')
+                    def branches = services.collectEntries { service ->
+                        [(service): {
+                            dir("${env.REPO_PATH_WIN}\\apps\\microservices\\${service}") {
+                                def localImage = "${env.LOCAL_IMAGE_PREFIX}-${service}:${env.IMAGE_TAG}"
+                                def demoAlias = "${env.LOCAL_IMAGE_PREFIX}-${service}:local"
+
+                                if (isUnix()) {
+                                    sh "docker build -t ${localImage} -t ${demoAlias} ."
+                                } else {
+                                    bat "docker build -t ${localImage} -t ${demoAlias} ."
+                                }
+
+                                echo "Built local image ${localImage}"
+                            }
+                        }]
+                    }
+                    parallel branches
+                }
+            }
+        }
+
+        stage('Deploy To Local Kubernetes') {
+            when {
+                expression { params.DEPLOY_TO_K8S && env.CAN_DEPLOY_TO_K8S == 'true' }
+            }
+            steps {
+                script {
+                    if (params.K8S_NAMESPACE != 'default') {
+                        if (isUnix()) {
+                            sh "kubectl apply -f '${env.REPO_PATH}/${env.K8S_MANIFEST_DIR}/namespaces.yaml'"
+                        } else {
+                            bat "kubectl apply -f \"${env.REPO_PATH_WIN}\\${env.K8S_MANIFEST_DIR}\\namespaces.yaml\""
+                        }
+                    }
+
+                    def services = env.SELECTED_SERVICES.tokenize(',')
+                    services.each { service ->
+                        def manifestSource = "${env.REPO_PATH_WIN}\\${env.K8S_MANIFEST_DIR}\\${service}-deployment.yaml"
+                        def renderedManifest = "${env.WORKSPACE}\\.jenkins-${service}-${params.K8S_NAMESPACE}.yaml"
+                        def localImage = "${env.LOCAL_IMAGE_PREFIX}-${service}:${env.IMAGE_TAG}"
+
+                        if (isUnix()) {
+                            sh """cp '${env.REPO_PATH}/${env.K8S_MANIFEST_DIR}/${service}-deployment.yaml' '${env.WORKSPACE}/.jenkins-${service}-${params.K8S_NAMESPACE}.yaml'
+sed -i 's/namespace: production/namespace: ${params.K8S_NAMESPACE}/g' '${env.WORKSPACE}/.jenkins-${service}-${params.K8S_NAMESPACE}.yaml'
+if command -v kind >/dev/null 2>&1; then
+    for c in \$(kind get clusters); do
+        kind load docker-image ${localImage} --name \$c || true
+    done
+fi
+kubectl -n ${params.K8S_NAMESPACE} delete svc ${service} --ignore-not-found=true
+kubectl apply -f '${env.WORKSPACE}/.jenkins-${service}-${params.K8S_NAMESPACE}.yaml'
+kubectl -n ${params.K8S_NAMESPACE} set image deployment/${service} ${service}=${localImage}
+kubectl -n ${params.K8S_NAMESPACE} rollout status deployment/${service} --timeout=600s || (kubectl -n ${params.K8S_NAMESPACE} get pods -l app=${service} -o wide; kubectl -n ${params.K8S_NAMESPACE} describe deployment ${service}; exit 1)"""
+                        } else {
+                            bat """@echo off
+powershell -NoProfile -Command "\$content = Get-Content -Raw '${manifestSource}'; \$content = \$content -replace 'namespace: production', 'namespace: ${params.K8S_NAMESPACE}'; Set-Content -Path '${renderedManifest}' -Value \$content"
+for /f %%C in ('kind get clusters 2^>NUL') do kind load docker-image ${localImage} --name %%C
+kubectl -n ${params.K8S_NAMESPACE} delete svc ${service} --ignore-not-found=true
+kubectl apply -f "${renderedManifest}"
+kubectl -n ${params.K8S_NAMESPACE} set image deployment/${service} ${service}=${localImage}
+kubectl -n ${params.K8S_NAMESPACE} rollout status deployment/${service} --timeout=600s
+if errorlevel 1 (
+    kubectl -n ${params.K8S_NAMESPACE} get pods -l app=${service} -o wide
+    kubectl -n ${params.K8S_NAMESPACE} describe deployment ${service}
+    exit /b 1
+)
+"""
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deployment Summary') {
+            when {
+                expression { params.DEPLOY_TO_K8S && env.CAN_DEPLOY_TO_K8S == 'true' }
+            }
+            steps {
+                script {
+                    def services = env.SELECTED_SERVICES.tokenize(',')
+                    services.each { service ->
+                        if (isUnix()) {
+                            sh "kubectl get deployment ${service} -n ${params.K8S_NAMESPACE}"
+                            sh "kubectl get svc ${service} -n ${params.K8S_NAMESPACE}"
+                        } else {
+                            bat "kubectl get deployment ${service} -n ${params.K8S_NAMESPACE}"
+                            bat "kubectl get svc ${service} -n ${params.K8S_NAMESPACE}"
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        failure {
+            script {
+                try {
+                    emailext(
+                        recipientProviders: [developers(), requestor()],
+                        to: 'anand.dpatil@gmail.com',
+                        subject: 'Build Failure: ${JOB_NAME} - #${BUILD_NUMBER}',
+                        body: '''
+                            <html>
+                            <head>
+                                <style>
+                                    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+                                    .header { background-color: #dc3545; color: white; padding: 15px; border-radius: 5px 5px 0 0; }
+                                    .content { background-color: #f8f9fa; padding: 20px; border: 1px solid #dee2e6; margin-bottom: 10px; }
+                                    .footer { margin-top: 20px; font-size: 12px; color: #6c757d; }
+                                    .build-info { margin: 10px 0; }
+                                    .btn { display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; }
+                                </style>
+                            </head>
+                            <body>
+                                <div class="header">
+                                    <h2>🚨 BUILD FAILURE ALERT</h2>
+                                </div>
+                                <div class="content">
+                                    <h3>${env.JOB_NAME} - Build #${env.BUILD_NUMBER}</h3>
+                                    <div class="build-info">
+                                        <p><strong>Status:</strong> FAILED</p>
+                                        <p><strong>Branch:</strong> ${env.GIT_BRANCH ?: 'N/A'}</p>
+                                        <p><strong>Repository:</strong> ${env.GIT_URL ?: 'N/A'}</p>
+                                        <p><strong>Duration:</strong> ${currentBuild.durationString}</p>
+                                        <p><strong>Build Log:</strong></p>
+                                        <pre>${BUILD_LOG, maxLines=50}</pre>
+                                    </div>
+                                    <p><a href="${env.BUILD_URL}" class="btn">View Full Build Details</a></p>
+                                </div>
+                                <div class="footer">
+                                    <p>This is an automated alert. Please check the build logs and fix the issue.</p>
+                                </div>
+                            </body>
+                            </html>
+                        ''',
+                        mimeType: 'text/html',
+                        attachLog: true
+                    )
+                    echo "Failure notification email sent successfully to anand.dpatil@gmail.com"
+                } catch (Exception e) {
+                    echo "WARNING: Failed to send failure notification email: ${e.message}"
+                    echo "Build failure will not be blocked due to email notification failure"
+                }
+            }
+        }
+        always {
+            script {
+                def services = env.SELECTED_SERVICES.tokenize(',')
+                services.each { service ->
+                    junit allowEmptyResults: true, testResults: "apps/microservices/${service}/target/surefire-reports/*.xml"
+                    archiveArtifacts allowEmptyArchive: true, artifacts: "apps/microservices/${service}/target/site/jacoco/**"
+                }
+            }
+            cleanWs()
+        }
+    }
+}

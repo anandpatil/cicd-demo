@@ -1,0 +1,19 @@
+name: Trigger Jenkins Feature CI
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Jenkins DemoCICD-feature build
+        run: |
+          curl -s -o /dev/null -w "HTTP %{http_code}" \
+            -X POST \
+            "${{ secrets.JENKINS_URL }}/generic-webhook-trigger/invoke?token=${{ secrets.JENKINS_FEATURE_CI_TOKEN }}"
+        # Required GitHub secrets:
+        #   JENKINS_URL              - e.g. http://your-jenkins-host:8080
+        #   JENKINS_FEATURE_CI_TOKEN - must match the token in Jenkinsfile-feature-ci triggers block ("feature-ci-trigger")
