@@ -84,11 +84,25 @@ jobs:
           echo "⚠️ Trivy scan failed or was blocked by Maven rate limiting."
           echo "   This scan is being treated as a warning so the pipeline can continue."
 
+      - name: Check for Trivy SARIF output
+        id: check_trivy_sarif
+        run: |
+          if [ -f "trivy-results.sarif" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Upload Trivy Scan Results
-        if: always()
+        if: steps.check_trivy_sarif.outputs.exists == 'true'
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: "trivy-results.sarif"
+
+      - name: Skip Trivy SARIF upload when file is missing
+        if: steps.check_trivy_sarif.outputs.exists == 'false'
+        run: |
+          echo "⚠️ No Trivy SARIF file was produced, so upload is skipped."
 
       - name: Run Trivy on Dockerfile
         run: |

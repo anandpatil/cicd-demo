@@ -22,6 +22,17 @@ Your job is to diagnose and implement fixes across local Jenkins, GitHub Actions
 3. Apply the smallest fix that preserves both Windows local CI/CD behavior and GitHub-hosted automation.
 4. Verify with logs, port checks, workflow syntax, or rollout/status commands whenever feasible.
 
+## Trivy Troubleshooting Guidance
+- For GitHub Actions Trivy scans, populate and cache `~/.m2/repository` before running the scan.
+- Use `mvn -B dependency:resolve` in the relevant microservice directories to avoid live Maven Central requests during scan time.
+- Prefer stable Trivy action versions instead of `master` and consider `--scanners vuln` to avoid slow secret scanning warnings.
+- Keep the Trivy scan non-blocking when external rate limits or missing SARIF output occur:
+  - use `continue-on-error: true`
+  - check whether `trivy-results.sarif` exists before uploading
+  - skip SARIF upload gracefully if the file is absent
+- Do not leave placeholder Dockerfile scan steps; either perform a real Trivy Dockerfile scan or remove the no-op step.
+- Treat scan failures caused by external repository rate limiting as warnings when the pipeline should continue.
+
 ## Output Format
 - State the root cause.
 - State the exact files or runtime state changed.
