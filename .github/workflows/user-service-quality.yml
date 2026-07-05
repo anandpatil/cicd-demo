@@ -29,6 +29,10 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      - name: Resolve Maven dependencies
+        working-directory: apps/microservices/user-service
+        run: mvn -B dependency:resolve
+
       - name: Run Tests and JaCoCo Check
         working-directory: apps/microservices/user-service
         run: mvn -B clean verify
@@ -57,6 +61,10 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: 'maven'
+
+      - name: Resolve Maven dependencies
+        working-directory: apps/microservices/user-service
+        run: mvn -B dependency:resolve
 
       - name: Sonar Scan (User Service)
         working-directory: apps/microservices/user-service
@@ -92,6 +100,10 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: 'maven'
+
+      - name: Resolve Maven dependencies
+        working-directory: apps/microservices/user-service
+        run: mvn -B dependency:resolve
 
       - name: Build User Service
         working-directory: apps/microservices/user-service

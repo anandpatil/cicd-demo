@@ -57,6 +57,22 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Cache Maven Local Repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Populate Maven local cache
+        run: |
+          for service in user-service order-service inventory-service; do
+            pushd apps/microservices/$service
+            mvn -B dependency:resolve
+            popd
+          done
+
       - name: Run OWASP Dependency Check
         run: |
           echo "🔍 Scanning dependencies for vulnerabilities..."

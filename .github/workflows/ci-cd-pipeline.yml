@@ -36,6 +36,10 @@ jobs:
           distribution: "temurin"
           cache: "maven"
 
+      - name: Resolve Maven dependencies for ${{ matrix.service }}
+        working-directory: ./apps/microservices/${{ matrix.service }}
+        run: mvn -B dependency:resolve
+
       - name: Build ${{ matrix.service }}
         working-directory: ./apps/microservices/${{ matrix.service }}
         run: mvn clean package -DskipTests=false
