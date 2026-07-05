@@ -69,14 +69,23 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Trivy Vulnerability Scanner
+        id: trivy_scan
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: "fs"
           scan-ref: "."
           format: "sarif"
           output: "trivy-results.sarif"
+        continue-on-error: true
+
+      - name: Warn on Trivy Scan Failure
+        if: steps.trivy_scan.conclusion == 'failure'
+        run: |
+          echo "⚠️ Trivy scan failed or was blocked by Maven rate limiting."
+          echo "   This scan is being treated as a warning so the pipeline can continue."
 
       - name: Upload Trivy Scan Results
+        if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: "trivy-results.sarif"
