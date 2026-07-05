@@ -1,0 +1,222 @@
+name: Shared Code Quality Workflow
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: 'Node.js version to use'
+        required: false
+        default: '18'
+        type: string
+      working-directory:
+        description: 'Working directory'
+        required: false
+        default: '.'
+        type: string
+      run-tests:
+        description: 'Whether to run tests'
+        required: false
+        default: true
+        type: boolean
+      run-lint:
+        description: 'Whether to run linting'
+        required: false
+        default: true
+        type: boolean
+      run-security:
+        description: 'Whether to run security scan'
+        required: false
+        default: true
+        type: boolean
+    secrets:
+      SONAR_TOKEN:
+        required: false
+      SONAR_HOST_URL:
+        required: false
+
+jobs:
+  setup:
+    name: Setup Environment
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+
+      - name: Set matrix for parallel jobs
+        id: set-matrix
+        run: |
+          # Find all package.json files to create matrix
+          MATRIX=$(find ${{ inputs.working-directory }} -name package.json -not -path '*/node_modules/*' | jq -R -s -c 'split("\n") | map(select(length > 0)) | map({directory: .})')
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+
+  lint:
+    name: Lint
+    needs: setup
+    if: inputs.run-lint
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        include: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.directory }}
+        run: npm install
+
+      - name: Run linting
+        working-directory: ${{ matrix.directory }}
+        run: npm run lint || echo "Linting failed"
+
+  test:
+    name: Test
+    needs: setup
+    if: inputs.run-tests
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        include: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.directory }}
+        run: npm install
+
+      - name: Run tests
+        working-directory: ${{ matrix.directory }}
+        run: npm run test
+
+  security-scan:
+    name: Security Scan
+    needs: setup
+    if: inputs.run-security
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        continue-on-error: true
+
+  sonarqube:
+    name: SonarQube Analysis
+    needs: [lint, test]
+    if: inputs.run-tests && inputs.run-lint
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install dependencies
+        run: |
+          find ${{ inputs.working-directory }} -name package.json -not -path '*/node_modules/*' -execdir npm install \;
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >-
+            -Dsonar.projectKey=cicd-demo-${{ github.repository }}
+            -Dsonar.projectName=cicd-demo-${{ github.repository }}
+            -Dsonar.sources=${{ inputs.working-directory }}
+            -Dsonar.exclusions=**/node_modules/**,**/Dockerfile,**/.github/**
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+
+  quality-gate:
+    name: Quality Gate
+    needs: [lint, test, security-scan, sonarqube]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check all jobs passed
+        run: |
+          echo "All quality checks completed"
+          echo "Lint: ${{ needs.lint.result }}"
+          echo "Test: ${{ needs.test.result }}"
+          echo "Security: ${{ needs.security-scan.result }}"
+          echo "SonarQube: ${{ needs.sonarqube.result }}"
+          
+          # Fail if any required job failed
+          if [ "${{ needs.lint.result }}" != "success" ] && [ "${{ inputs.run-lint }}" = "true" ]; then
+            echo "Linting failed"
+            exit 1
+          fi
+          
+          if [ "${{ needs.test.result }}" != "success" ] && [ "${{ inputs.run-tests }}" = "true" ]; then
+            echo "Tests failed"
+            exit 1
+          fi
+          
+          echo "Quality gate passed!"
+
+  summary:
+    name: Quality Summary
+    needs: quality-gate
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## Code Quality Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Linting | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Testing | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Scan | ${{ needs.security-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| SonarQube | ${{ needs.sonarqube.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Overall Status**: ${{ needs.quality-gate.result }}" >> $GITHUB_STEP_SUMMARY

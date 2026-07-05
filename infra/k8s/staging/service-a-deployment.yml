@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-a
+  namespace: cicd-demo-staging
+  labels:
+    app: service-a
+    version: v1
+    environment: staging
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: service-a
+      version: v1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: service-a
+        version: v1
+        environment: staging
+    spec:
+      containers:
+        - name: service-a
+          image: ${DOCKER_REGISTRY}/cicd-demo-service-a:${IMAGE_TAG}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: "staging"
+            - name: PORT
+              value: "3000"
+          envFrom:
+            - configMapRef:
+                name: cicd-demo-config
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 1
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      imagePullSecrets:
+        - name: docker-registry-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-a
+  namespace: cicd-demo-staging
+  labels:
+    app: service-a
+    environment: staging
+spec:
+  selector:
+    app: service-a
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+  type: ClusterIP

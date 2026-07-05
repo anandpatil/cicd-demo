@@ -1,0 +1,118 @@
+{
+  "environment": "production",
+  "version": "1.0.0",
+  "services": {
+    "service-a": {
+      "port": 3000,
+      "host": "0.0.0.0",
+      "timeout": 10000,
+      "maxConnections": 1000,
+      "logLevel": "info",
+      "healthCheck": {
+        "path": "/health",
+        "interval": 10000,
+        "timeout": 5000
+      }
+    },
+    "service-b": {
+      "port": 3001,
+      "host": "0.0.0.0",
+      "timeout": 10000,
+      "maxConnections": 1000,
+      "logLevel": "info",
+      "serviceAUrl": "http://service-a:3000",
+      "healthCheck": {
+        "path": "/health",
+        "interval": 10000,
+        "timeout": 5000
+      }
+    }
+  },
+  "database": {
+    "host": "${DB_HOST}",
+    "port": ${DB_PORT},
+    "name": "cicd_demo_production",
+    "user": "${DB_USER}",
+    "password": "${DB_PASSWORD}",
+    "ssl": true,
+    "pool": {
+      "min": 5,
+      "max": 50,
+      "idleTimeout": 30000,
+      "connectionTimeout": 5000
+    }
+  },
+  "cache": {
+    "enabled": true,
+    "type": "redis",
+    "host": "${REDIS_HOST}",
+    "port": ${REDIS_PORT},
+    "password": "${REDIS_PASSWORD}",
+    "ttl": 3600,
+    "prefix": "cicd-demo-production:"
+  },
+  "messaging": {
+    "enabled": true,
+    "type": "rabbitmq",
+    "host": "${RABBITMQ_HOST}",
+    "port": ${RABBITMQ_PORT},
+    "user": "${RABBITMQ_USER}",
+    "password": "${RABBITMQ_PASSWORD}"
+  },
+  "api": {
+    "rateLimit": {
+      "windowMs": 15 * 60 * 1000, // 15 minutes
+      "max": 10000
+    },
+    "cors": {
+      "origin": ["https://cicd-demo.example.com"],
+      "methods": ["GET", "POST", "PUT", "DELETE"],
+      "allowedHeaders": ["Content-Type", "Authorization"]
+    }
+  },
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "output": "stdout",
+    "includeTimestamp": true,
+    "includeLevel": true,
+    "includeService": true
+  },
+  "monitoring": {
+    "metrics": {
+      "enabled": true,
+      "port": 9090,
+      "path": "/metrics"
+    },
+    "tracing": {
+      "enabled": true,
+      "serviceName": "cicd-demo",
+      "sampler": {
+        "type": "probabilistic",
+        "param": 0.1
+      }
+    },
+    "alerts": {
+      "enabled": true,
+      "errorThreshold": 0.01,
+      "responseTimeThreshold": 1000
+    }
+  },
+  "features": {
+    "debugMode": false,
+    "detailedErrors": false,
+    "requestLogging": true,
+    "performanceMonitoring": true
+  },
+  "security": {
+    "helmet": true,
+    "csp": true,
+    "hsts": {
+      "maxAge": 31536000,
+      "includeSubDomains": true,
+      "preload": true
+    },
+    "rateLimiting": true,
+    "inputValidation": true
+  }
+}

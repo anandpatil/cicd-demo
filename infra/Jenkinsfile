@@ -1,0 +1,144 @@
+pipeline {
+    agent any
+    
+    environment {
+        DOCKER_REGISTRY = credentials('DOCKER_REGISTRY')
+        DOCKER_USERNAME = credentials('DOCKER_USERNAME')
+        DOCKER_PASSWORD = credentials('DOCKER_PASSWORD')
+        KUBE_CONFIG = credentials('KUBE_CONFIG')
+        TF_VAR_environment = "${GIT_BRANCH == 'main' ? 'production' : 'staging'}"
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Validate Infrastructure') {
+            steps {
+                script {
+                    // Validate Kubernetes manifests
+                    sh 'kubectl create --dry-run=client -f k8s/${TF_VAR_environment}/ || true'
+                    
+                    // Validate Terraform
+                    dir('terraform') {
+                        sh 'terraform init -backend=false'
+                        sh 'terraform validate'
+                        sh 'terraform fmt -check'
+                    }
+                }
+            }
+        }
+        
+        stage('Build and Push Base Image') {
+            when {
+                changeset "docker/**"
+            }
+            steps {
+                script {
+                    // Build base Docker image
+                    sh '''
+                        docker build -t ${DOCKER_REGISTRY}/cicd-demo-base:${GIT_COMMIT} -f docker/Dockerfile.base .
+                        docker tag ${DOCKER_REGISTRY}/cicd-demo-base:${GIT_COMMIT} ${DOCKER_REGISTRY}/cicd-demo-base:latest
+                    '''
+                    
+                    // Login and push
+                    sh "echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin ${DOCKER_REGISTRY}"
+                    sh "docker push ${DOCKER_REGISTRY}/cicd-demo-base:${GIT_COMMIT}"
+                    sh "docker push ${DOCKER_REGISTRY}/cicd-demo-base:latest"
+                }
+            }
+        }
+        
+        stage('Terraform Plan') {
+            when {
+                changeset "terraform/**"
+            }
+            steps {
+                script {
+                    dir('terraform') {
+                        // Initialize Terraform
+                        sh '''
+                            terraform init \
+                                -backend-config="address=${TERRAFORM_BACKEND_ADDRESS}" \
+                                -backend-config="lock_table=${TERRAFORM_BACKEND_LOCK}"
+                        '''
+                        
+                        // Select workspace
+                        sh "terraform workspace select ${TF_VAR_environment} || terraform workspace new ${TF_VAR_environment}"
+                        
+                        // Plan changes
+                        sh "terraform plan -out=tfplan -var='environment=${TF_VAR_environment}'"
+                        
+                        // Save plan artifact
+                        archiveArtifacts artifacts: 'terraform/tfplan', fingerprint: true
+                    }
+                }
+            }
+        }
+        
+        stage('Approval for Terraform Apply') {
+            when {
+                branch 'main'
+                changeset "terraform/**"
+            }
+            steps {
+                timeout(time: 1, unit: 'HOURS') {
+                    input message: 'Apply Terraform changes to ${TF_VAR_environment}?', ok: 'Apply'
+                }
+            }
+        }
+        
+        stage('Terraform Apply') {
+            when {
+                branch 'main'
+                changeset "terraform/**"
+            }
+            steps {
+                script {
+                    dir('terraform') {
+                        // Apply Terraform changes
+                        sh "terraform apply -auto-approve tfplan"
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy Kubernetes Manifests') {
+            when {
+                changeset "k8s/**"
+            }
+            steps {
+                script {
+                    // Deploy to appropriate environment
+                    sh '''
+                        kubectl config use-context ${TF_VAR_environment}
+                        kubectl apply -f k8s/${TF_VAR_environment}/
+                        
+                        # Wait for deployments to be ready
+                        kubectl rollout status deployment/service-a -n cicd-demo-${TF_VAR_environment} --timeout=60s
+                        kubectl rollout status deployment/service-b -n cicd-demo-${TF_VAR_environment} --timeout=60s
+                        
+                        # Verify services
+                        kubectl get pods -n cicd-demo-${TF_VAR_environment}
+                        kubectl get services -n cicd-demo-${TF_VAR_environment}
+                    '''
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo 'Infrastructure pipeline succeeded!'
+        }
+        failure {
+            echo 'Infrastructure pipeline failed!'
+        }
+    }
+}

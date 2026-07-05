@@ -1,0 +1,102 @@
+{
+  "environment": "staging",
+  "version": "1.0.0",
+  "services": {
+    "service-a": {
+      "port": 3000,
+      "host": "0.0.0.0",
+      "timeout": 30000,
+      "maxConnections": 100,
+      "logLevel": "debug",
+      "healthCheck": {
+        "path": "/health",
+        "interval": 5000,
+        "timeout": 2000
+      }
+    },
+    "service-b": {
+      "port": 3001,
+      "host": "0.0.0.0",
+      "timeout": 30000,
+      "maxConnections": 100,
+      "logLevel": "debug",
+      "serviceAUrl": "http://service-a:3000",
+      "healthCheck": {
+        "path": "/health",
+        "interval": 5000,
+        "timeout": 2000
+      }
+    }
+  },
+  "database": {
+    "host": "${DB_HOST}",
+    "port": ${DB_PORT},
+    "name": "cicd_demo_staging",
+    "user": "${DB_USER}",
+    "password": "${DB_PASSWORD}",
+    "ssl": false,
+    "pool": {
+      "min": 2,
+      "max": 10,
+      "idleTimeout": 30000,
+      "connectionTimeout": 5000
+    }
+  },
+  "cache": {
+    "enabled": true,
+    "type": "redis",
+    "host": "${REDIS_HOST}",
+    "port": ${REDIS_PORT},
+    "password": "${REDIS_PASSWORD}",
+    "ttl": 3600,
+    "prefix": "cicd-demo-staging:"
+  },
+  "messaging": {
+    "enabled": false,
+    "type": "rabbitmq",
+    "host": "${RABBITMQ_HOST}",
+    "port": ${RABBITMQ_PORT},
+    "user": "${RABBITMQ_USER}",
+    "password": "${RABBITMQ_PASSWORD}"
+  },
+  "api": {
+    "rateLimit": {
+      "windowMs": 15 * 60 * 1000, // 15 minutes
+      "max": 1000
+    },
+    "cors": {
+      "origin": "*",
+      "methods": ["GET", "POST", "PUT", "DELETE"],
+      "allowedHeaders": ["Content-Type", "Authorization"]
+    }
+  },
+  "logging": {
+    "level": "debug",
+    "format": "json",
+    "output": "stdout",
+    "includeTimestamp": true,
+    "includeLevel": true,
+    "includeService": true
+  },
+  "monitoring": {
+    "metrics": {
+      "enabled": true,
+      "port": 9090,
+      "path": "/metrics"
+    },
+    "tracing": {
+      "enabled": true,
+      "serviceName": "cicd-demo",
+      "sampler": {
+        "type": "const",
+        "param": 1
+      }
+    }
+  },
+  "features": {
+    "debugMode": true,
+    "detailedErrors": true,
+    "requestLogging": true,
+    "performanceMonitoring": true
+  }
+}

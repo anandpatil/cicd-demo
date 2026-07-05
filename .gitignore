@@ -1,0 +1,86 @@
+# Dependencies
+node_modules/
+services/*/node_modules/
+libs/node_modules/
+
+# Build output
+dist/
+build/
+services/*/dist/
+services/*/build/
+libs/dist/
+libs/build/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+services/*/logs/
+services/*/*.log
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+services/*/.env
+services/*/.env.*
+config/environments/*/.env
+!config/environments/*/.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+services/*/coverage/
+libs/coverage/
+
+# Docker
+.docker/
+
+# Kubernetes
+.kube/
+
+# Minikube
+.minikube/
+
+# Temporary files
+tmp/
+temp/
+*~/.tmp
+*~/.temp
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# Jenkins
+.jenkins/
+
+# SonarQube
+.sonar/
+
+# Git
+.git
+.gitmodules
+
+# Editor directories and files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

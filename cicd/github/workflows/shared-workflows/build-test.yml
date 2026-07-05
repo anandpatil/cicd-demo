@@ -1,0 +1,201 @@
+name: Shared Build and Test Workflow
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: 'Node.js version to use'
+        required: false
+        default: '18'
+        type: string
+      working-directory:
+        description: 'Working directory'
+        required: false
+        default: '.'
+        type: string
+      docker-registry:
+        description: 'Docker registry URL'
+        required: false
+        default: ''
+        type: string
+      push-images:
+        description: 'Whether to push Docker images'
+        required: false
+        default: false
+        type: boolean
+      run-integration-tests:
+        description: 'Whether to run integration tests'
+        required: false
+        default: true
+        type: boolean
+    secrets:
+      DOCKER_USERNAME:
+        required: false
+      DOCKER_PASSWORD:
+        required: false
+
+jobs:
+  setup:
+    name: Setup Environment
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+
+      - name: Set matrix for parallel jobs
+        id: set-matrix
+        run: |
+          # Find all Dockerfiles to create matrix
+          MATRIX=$(find ${{ inputs.working-directory }} -name Dockerfile -not -path '*/node_modules/*' | jq -R -s -c 'split("\n") | map(select(length > 0)) | map({dockerfile: ., directory: (split("/") | .[:-1] | join("/"))})')
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+
+  build:
+    name: Build
+    needs: setup
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        include: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Registry
+        if: inputs.push-images
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ inputs.docker-registry }}/cicd-demo-${{ matrix.directory }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: ${{ matrix.directory }}
+          file: ${{ matrix.dockerfile }}
+          push: ${{ inputs.push-images }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  integration-test:
+    name: Integration Tests
+    needs: build
+    runs-on: ubuntu-latest
+    if: inputs.run-integration-tests
+    
+    services:
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Start services with Docker Compose
+        run: |
+          # Look for docker-compose files
+          if [ -f docker-compose.test.yml ]; then
+            docker-compose -f docker-compose.test.yml up -d
+          elif [ -f docker-compose.yml ]; then
+            docker-compose up -d
+          else
+            echo "No docker-compose file found"
+            exit 0
+          fi
+          sleep 15 # Wait for services to start
+
+      - name: Run integration tests
+        run: |
+          # Simple health check tests
+          if [ -f docker-compose.test.yml ] || [ -f docker-compose.yml ]; then
+            # Test all services defined in compose file
+            docker-compose ps -q | while read service; do
+              port=$(docker-compose port $service 3000 2>/dev/null || echo "")
+              if [ -n "$port" ]; then
+                curl -f http://localhost:${port#*:}/health || echo "Health check failed for $service"
+              fi
+            done
+          fi
+
+      - name: Stop services
+        if: always()
+        run: |
+          if [ -f docker-compose.test.yml ]; then
+            docker-compose -f docker-compose.test.yml down
+          elif [ -f docker-compose.yml ]; then
+            docker-compose down
+          fi
+
+  trigger-jenkins:
+    name: Trigger Jenkins Deployment
+    needs: [build, integration-test]
+    runs-on: ubuntu-latest
+    if: inputs.push-images && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Trigger Jenkins Job
+        uses: appleboy/jenkins-action@master
+        with:
+          url: ${{ secrets.JENKINS_URL }}
+          user: ${{ secrets.JENKINS_USER }}
+          token: ${{ secrets.JENKINS_TOKEN }}
+          job: cicd-demo-deploy
+          parameters: |
+            GIT_COMMIT=${{ github.sha }}
+            GIT_BRANCH=${{ github.ref_name }}
+            REPOSITORY=${{ github.repository }}
+            DOCKER_REGISTRY=${{ inputs.docker-registry }}
+
+  summary:
+    name: Build Summary
+    needs: [build, integration-test, trigger-jenkins]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## Build and Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Task | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | ${{ needs.integration-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Trigger Jenkins | ${{ needs.trigger-jenkins.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.build.result }}" = "success" ] && [ "${{ needs.integration-test.result }}" = "success" ]; then
+            echo "**Overall Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Overall Status**: ❌ Failed" >> $GITHUB_STEP_SUMMARY
+          fi

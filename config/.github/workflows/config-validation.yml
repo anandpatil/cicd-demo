@@ -1,0 +1,227 @@
+name: Configuration Validation
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  validate-json:
+    name: Validate JSON Files
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Validate JSON syntax
+        run: |
+          # Find all JSON files and validate them
+          find . -name "*.json" -not -path "./.git/*" -not -path "./node_modules/*" | while read file; do
+            echo "Validating $file"
+            jq empty "$file" || { echo "Invalid JSON: $file"; exit 1; }
+          done
+
+  validate-yaml:
+    name: Validate YAML Files
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Validate YAML syntax
+        run: |
+          # Find all YAML files and validate them
+          find . -name "*.yml" -o -name "*.yaml" | grep -v ".git/" | xargs yamllint
+
+  check-secrets:
+    name: Check for Committed Secrets
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install gitleaks
+        run: |
+          wget https://github.com/gitleaks/gitleaks/releases/download/v8.16.1/gitleaks_8.16.1_linux_x64.tar.gz
+          tar -xzf gitleaks_8.16.1_linux_x64.tar.gz
+          sudo mv gitleaks /usr/local/bin/
+
+      - name: Scan for secrets
+        run: gitleaks detect --source . --report-path gitleaks-report.json --exit-code 1
+
+      - name: Upload scan results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+
+  validate-config-structure:
+    name: Validate Configuration Structure
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate environment configurations
+        run: |
+          #!/bin/bash
+          
+          # Check that all environments have required files
+          environments=("development" "staging" "production")
+          required_files=("config.json" ".env")
+          
+          for env in "${environments[@]}"; do
+            echo "Checking environment: $env"
+            for file in "${required_files[@]}"; do
+              if [ ! -f "environments/$env/$file" ]; then
+                echo "Missing file: environments/$env/$file"
+                exit 1
+              fi
+            done
+          done
+          
+          # Check that all services have configuration
+          services=("service-a" "service-b")
+          for service in "${services[@]}"; do
+            echo "Checking service: $service"
+            if [ ! -d "services/$service" ]; then
+              echo "Missing service directory: services/$service"
+              exit 1
+            fi
+          done
+
+  validate-config-values:
+    name: Validate Configuration Values
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Validate configuration values
+        run: |
+          #!/bin/bash
+          
+          # Create a simple validation script
+          cat > validate-config.js << 'EOF'
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Validate JSON configuration files
+          function validateConfigFile(filePath) {
+            const config = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            
+            // Check for required fields
+            const requiredFields = ['environment', 'version', 'services'];
+            for (const field of requiredFields) {
+              if (!(field in config)) {
+                console.error(`Missing required field: ${field} in ${filePath}`);
+                return false;
+              }
+            }
+            
+            // Check service configurations
+            if (config.services) {
+              for (const [serviceName, serviceConfig] of Object.entries(config.services)) {
+                if (!serviceConfig.port || !serviceConfig.host) {
+                  console.error(`Service ${serviceName} missing required fields in ${filePath}`);
+                  return false;
+                }
+              }
+            }
+            
+            return true;
+          }
+          
+          // Find and validate all config files
+          const environments = ['development', 'staging', 'production'];
+          let allValid = true;
+          
+          for (const env of environments) {
+            const configPath = path.join('environments', env, 'config.json');
+            if (fs.existsSync(configPath)) {
+              console.log(`Validating ${configPath}`);
+              if (!validateConfigFile(configPath)) {
+                allValid = false;
+              }
+            } else {
+              console.error(`Config file not found: ${configPath}`);
+              allValid = false;
+            }
+          }
+          
+          if (!allValid) {
+            process.exit(1);
+          }
+          
+          console.log('All configuration files are valid!');
+          EOF
+          
+          node validate-config.js
+
+  trigger-jenkins:
+    name: Trigger Jenkins Configuration Update
+    needs: [validate-json, validate-yaml, check-secrets, validate-config-structure, validate-config-values]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Trigger Jenkins Job
+        uses: appleboy/jenkins-action@master
+        with:
+          url: ${{ secrets.JENKINS_URL }}
+          user: ${{ secrets.JENKINS_USER }}
+          token: ${{ secrets.JENKINS_TOKEN }}
+          job: cicd-demo-config-update
+          parameters: |
+            GIT_COMMIT=${{ github.sha }}
+            GIT_BRANCH=${{ github.ref_name }}
+            REPOSITORY=cicd-demo-config
+
+  summary:
+    name: Validation Summary
+    needs: [validate-json, validate-yaml, check-secrets, validate-config-structure, validate-config-values, trigger-jenkins]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## Configuration Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| JSON Validation | ${{ needs.validate-json.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| YAML Validation | ${{ needs.validate-yaml.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secrets Scan | ${{ needs.check-secrets.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Structure Validation | ${{ needs.validate-config-structure.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Values Validation | ${{ needs.validate-config-values.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Trigger Jenkins | ${{ needs.trigger-jenkins.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.validate-json.result }}" = "success" ] && \
+             [ "${{ needs.validate-yaml.result }}" = "success" ] && \
+             [ "${{ needs.check-secrets.result }}" = "success" ] && \
+             [ "${{ needs.validate-config-structure.result }}" = "success" ] && \
+             [ "${{ needs.validate-config-values.result }}" = "success" ]; then
+            echo "**Overall Status**: ✅ All validations passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Overall Status**: ❌ Some validations failed" >> $GITHUB_STEP_SUMMARY
+          fi

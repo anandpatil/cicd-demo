@@ -1,8 +1,56 @@
 {
   "name": "cicd-demo",
   "version": "1.0.0",
-  "description": "CI/CD Demo Project",
+  "description": "CI/CD Demo - Monorepo with microservices, infrastructure, CI/CD, config, and libs",
+  "private": true,
+  "workspaces": [
+    "services/*",
+    "libs"
+  ],
   "scripts": {
-    "build": "echo 'Build complete'"
+    "install:all": "npm install && npm run install:services && npm run install:libs",
+    "install:services": "cd services/service-a && npm install && cd ../service-b && npm install",
+    "install:libs": "cd libs && npm install",
+    "build:all": "npm run build:services && npm run build:libs",
+    "build:services": "cd services/service-a && npm run build && cd ../service-b && npm run build",
+    "build:libs": "cd libs && npm run build",
+    "test:all": "npm run test:services && npm run test:libs",
+    "test:services": "cd services/service-a && npm test && cd ../service-b && npm test",
+    "test:libs": "cd libs && npm test",
+    "lint:all": "npm run lint:services && npm run lint:libs",
+    "lint:services": "cd services/service-a && npm run lint && cd ../service-b && npm run lint",
+    "lint:libs": "cd libs && npm run lint",
+    "start:services": "cd services/service-a && npm start & cd ../service-b && npm start",
+    "docker:build": "cd services/service-a && docker build -t cicd-demo-service-a:latest . && cd ../service-b && docker build -t cicd-demo-service-b:latest .",
+    "docker:push": "docker push cicd-demo-service-a:latest && docker push cicd-demo-service-b:latest",
+    "k8s:deploy:staging": "cd infra && kubectl apply -f k8s/staging/",
+    "k8s:deploy:production": "cd infra && kubectl apply -f k8s/production/",
+    "clean": "rm -rf node_modules services/*/node_modules libs/node_modules",
+    "setup": "npm run install:all && npm run build:all"
+  },
+  "keywords": [
+    "cicd",
+    "demo",
+    "microservices",
+    "docker",
+    "kubernetes",
+    "github-actions",
+    "jenkins",
+    "monorepo",
+    "devops",
+    "infrastructure-as-code"
+  ],
+  "author": "anandpatil",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anandpatil/cicd-demo.git"
+  },
+  "bugs": {
+    "url": "https://github.com/anandpatil/cicd-demo/issues"
+  },
+  "homepage": "https://github.com/anandpatil/cicd-demo#readme",
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
