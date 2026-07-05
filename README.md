@@ -238,7 +238,7 @@ SPRING_PROFILES_ACTIVE: production
 - [🐙 GitHub Setup](github/SETUP.md)
 - [⚙️ Makefile Commands](Makefile)
 
-## 🎓 For CDAC Lecture
+## 🎓 For Workshop
 
 ### Using GitHub Codespaces (Recommended)
 1. Click "Code" button → "Codespaces" → "Create codespace on main"
