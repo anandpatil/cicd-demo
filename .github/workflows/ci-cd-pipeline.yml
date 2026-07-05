@@ -2,20 +2,20 @@ name: DevSecOps CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, master, develop, 'feature/**' ]
+    branches: [master, dev, "feature/**"]
   pull_request:
-    branches: [ main, master ]
+    branches: [master]
   workflow_dispatch:
 
 env:
-  JAVA_VERSION: '17'
-  DOCKER_REGISTRY: docker.io
-  REGISTRY_URL: docker.io
-  STAGING_URL: 'http://staging.cdac-demo.com'
-  SERVICE_TIMEOUT: '60'
-  USER_SERVICE_PORT: '8081'
-  ORDER_SERVICE_PORT: '8082'
-  INVENTORY_SERVICE_PORT: '8083'
+  JAVA_VERSION: "17"
+  DOCKER_REGISTRY: ghcr.io
+  REGISTRY_URL: ghcr.io
+  STAGING_URL: "http://staging-demo.com"
+  SERVICE_TIMEOUT: "60"
+  USER_SERVICE_PORT: "8081"
+  ORDER_SERVICE_PORT: "8082"
+  INVENTORY_SERVICE_PORT: "8083"
 
 jobs:
   build-and-test:
@@ -24,7 +24,7 @@ jobs:
     strategy:
       matrix:
         service: [user-service, order-service, inventory-service]
-    
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -33,8 +33,8 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'temurin'
-          cache: 'maven'
+          distribution: "temurin"
+          cache: "maven"
 
       - name: Build ${{ matrix.service }}
         working-directory: ./apps/microservices/${{ matrix.service }}
@@ -60,9 +60,6 @@ jobs:
       security-events: write
       actions: read
     if: github.event_name == 'push'
-    permissions:
-      security-events: write
-      contents: read
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -70,16 +67,15 @@ jobs:
       - name: Run Trivy Vulnerability Scanner
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "trivy-results.sarif"
 
       - name: Upload Trivy Scan Results
         uses: github/codeql-action/upload-sarif@v3
-        uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: "trivy-results.sarif"
 
       - name: Run Trivy on Dockerfile
         run: |
@@ -91,12 +87,12 @@ jobs:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest
     needs: security-scan
-    if: github.event_name == 'push' 
+    if: github.event_name == 'push'
     outputs:
       user_image: ${{ steps.user_meta.outputs.tags }}
       order_image: ${{ steps.order_meta.outputs.tags }}
       inventory_image: ${{ steps.inventory_meta.outputs.tags }}
-    
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -177,7 +173,7 @@ jobs:
           labels: ${{ steps.user_meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          
+
       - name: Build and Push Order Service
         uses: docker/build-push-action@v5
         with:
@@ -218,7 +214,7 @@ jobs:
     concurrency:
       group: deploy-staging
       cancel-in-progress: false
-    
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -276,7 +272,7 @@ jobs:
     name: Smoke Tests
     runs-on: ubuntu-latest
     needs: deploy-staging
-    
+
     steps:
       - name: Wait for Services to Be Ready
         run: |
@@ -338,9 +334,17 @@ jobs:
   notify:
     name: Notifications
     runs-on: ubuntu-latest
-    needs: [build-and-test, security-scan, docker-build, request-approval, deploy-staging, smoke-tests]
+    needs:
+      [
+        build-and-test,
+        security-scan,
+        docker-build,
+        request-approval,
+        deploy-staging,
+        smoke-tests,
+      ]
     if: always()
-    
+
     steps:
       - name: Send Slack Notification
         if: vars.SLACK_WEBHOOK_URL != ''
@@ -380,5 +384,5 @@ jobs:
             Branch: ${{ github.ref_name }}
             Commit: ${{ github.sha }}
             Workflow: ${{ github.workflow }}
-            
+
             <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Logs>
